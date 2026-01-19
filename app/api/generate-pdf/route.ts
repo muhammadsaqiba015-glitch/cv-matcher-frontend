@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
-import { unlink } from 'fs/promises';
+import { unlink, readFile } from 'fs/promises';
 
 export async function POST(request: NextRequest) {
     let tempPdfPath: string | null = null;
@@ -19,20 +19,14 @@ export async function POST(request: NextRequest) {
         // Import service
         const pdfGenerator = require('@/services/pdfGenerator');
 
-        // Generate PDF
-        const uploadDir = path.join(process.cwd(), 'uploads');
-
-        // Ensure upload directory exists
-        const fs = require('fs');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-
+        // Generate PDF to /tmp
+        const uploadDir = '/tmp';
         tempPdfPath = path.join(uploadDir, `cv_${Date.now()}.pdf`);
+
         await pdfGenerator.generatePDF(optimizedCV, tempPdfPath);
 
-        // Read the PDF file
-        const pdfBuffer = fs.readFileSync(tempPdfPath);
+        // Read the PDF file using fs/promises
+        const pdfBuffer = await readFile(tempPdfPath);
 
         // Clean up
         await unlink(tempPdfPath);

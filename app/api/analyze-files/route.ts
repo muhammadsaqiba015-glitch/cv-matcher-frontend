@@ -21,15 +21,11 @@ export async function POST(request: NextRequest) {
         const bytes = await cvFile.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        const uploadDir = path.join(process.cwd(), 'uploads');
+        const uploadDir = '/tmp';;
         const fileName = `${Date.now()}-${cvFile.name}`;
         cvFilePath = path.join(uploadDir, fileName);
 
-        // Ensure upload directory exists
-        const fs = require('fs');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
+
 
         await writeFile(cvFilePath, buffer);
 
