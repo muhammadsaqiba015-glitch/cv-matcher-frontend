@@ -7,16 +7,20 @@ const weights = require('../config/weights.config');
  * Phase 2: Deep AI analysis of CV against Job Description
  */
 class ClaudeAnalyzer {
-  
+
   constructor() {
+    console.log('Checking API key...');
+    console.log('API key exists:', !!process.env.ANTHROPIC_API_KEY);
+    console.log('API key starts with:', process.env.ANTHROPIC_API_KEY?.substring(0, 15));
+
     if (!process.env.ANTHROPIC_API_KEY) {
       throw new Error('ANTHROPIC_API_KEY is not set in environment variables');
     }
-    
+
     this.client = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY
     });
-    
+
     this.model = 'claude-sonnet-4-20250514'; // Using Claude Sonnet 4.5
     this.maxTokens = 4096;
   }
@@ -31,7 +35,7 @@ class ClaudeAnalyzer {
     try {
       // Generate the analysis prompt
       const prompt = prompts.generateAnalysisPrompt(jobDescription, cvText);
-      
+
       // Call Claude API
       const response = await this.client.messages.create({
         model: this.model,
@@ -44,13 +48,13 @@ class ClaudeAnalyzer {
         ],
         temperature: 0.3 // Lower temperature for more consistent, objective analysis
       });
-      
+
       // Parse the response
       const analysis = this.parseResponse(response);
-      
+
       // Calculate overall AI score
       const overallScore = this.calculateOverallScore(analysis);
-      
+
       return {
         overallScore,
         aspects: {
@@ -62,7 +66,7 @@ class ClaudeAnalyzer {
         assessment: analysis.overallAssessment,
         rawResponse: response
       };
-      
+
     } catch (error) {
       throw new Error(`Claude AI analysis failed: ${error.message}`);
     }
@@ -77,29 +81,29 @@ class ClaudeAnalyzer {
     try {
       // Extract text from Claude's response
       const textContent = response.content.find(block => block.type === 'text');
-      
+
       if (!textContent) {
         throw new Error('No text content in Claude response');
       }
-      
+
       // Clean the text (remove markdown code blocks if present)
       let jsonText = textContent.text.trim();
-      
+
       // Remove markdown code fences if present
       if (jsonText.startsWith('```json')) {
         jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?$/g, '');
       } else if (jsonText.startsWith('```')) {
         jsonText = jsonText.replace(/```\n?/g, '').replace(/```\n?$/g, '');
       }
-      
+
       // Parse JSON
       const parsed = JSON.parse(jsonText);
-      
+
       // Validate required fields
       this.validateAnalysis(parsed);
-      
+
       return parsed;
-      
+
     } catch (error) {
       console.error('Failed to parse Claude response:', error);
       throw new Error(`Failed to parse AI response: ${error.message}`);
@@ -118,7 +122,7 @@ class ClaudeAnalyzer {
       'careerGrowth',
       'overallAssessment'
     ];
-    
+
     requiredFields.forEach(field => {
       if (!analysis[field]) {
         throw new Error(`Missing required field: ${field}`);
@@ -136,13 +140,13 @@ class ClaudeAnalyzer {
    */
   calculateOverallScore(analysis) {
     const aspectWeights = weights.aspects;
-    
-    const weightedScore = 
+
+    const weightedScore =
       (analysis.skillsMatch.score * aspectWeights.skillsMatch) +
       (analysis.experienceQuality.score * aspectWeights.experienceQuality) +
       (analysis.educationFit.score * aspectWeights.educationFit) +
       (analysis.careerGrowth.score * aspectWeights.careerGrowth);
-    
+
     return Math.round(weightedScore);
   }
 
@@ -154,7 +158,7 @@ class ClaudeAnalyzer {
   async extractKeywords(jobDescription) {
     try {
       const prompt = prompts.generateKeywordExtractionPrompt(jobDescription);
-      
+
       const response = await this.client.messages.create({
         model: this.model,
         max_tokens: 2048,
@@ -166,19 +170,19 @@ class ClaudeAnalyzer {
         ],
         temperature: 0.2
       });
-      
+
       const textContent = response.content.find(block => block.type === 'text');
       let jsonText = textContent.text.trim();
-      
+
       // Clean markdown
       if (jsonText.startsWith('```json')) {
         jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?$/g, '');
       } else if (jsonText.startsWith('```')) {
         jsonText = jsonText.replace(/```\n?/g, '').replace(/```\n?$/g, '');
       }
-      
+
       return JSON.parse(jsonText);
-      
+
     } catch (error) {
       throw new Error(`Keyword extraction failed: ${error.message}`);
     }
@@ -200,7 +204,7 @@ class ClaudeAnalyzer {
           }
         ]
       });
-      
+
       return response.content.length > 0;
     } catch (error) {
       throw new Error(`Claude API connection test failed: ${error.message}`);
