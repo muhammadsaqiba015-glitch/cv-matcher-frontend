@@ -68,6 +68,13 @@ class ClaudeAnalyzer {
       };
 
     } catch (error) {
+      console.error('Full Anthropic error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        headers: error.headers,
+        response: error.response
+      });
       throw new Error(`Claude AI analysis failed: ${error.message}`);
     }
   }
