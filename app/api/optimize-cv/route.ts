@@ -1,0 +1,80 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { writeFile, unlink } from 'fs/promises';
+import path from 'path';
+
+export async function POST(request: NextRequest) {
+    let cvFilePath: string | null = null;
+
+    try {
+        const formData = await request.formData();
+        const cvFile = formData.get('cvFile') as File;
+        const jdText = formData.get('jdText') as string;
+        const optimizationLevel = formData.get('optimizationLevel') as string;
+        const analysisResultsStr = formData.get('analysisResults') as string;
+
+        if (!cvFile || !jdText || !analysisResultsStr) {
+            return NextResponse.json(
+                { success: false, error: 'CV file, job description, and analysis results are required' },
+                { status: 400 }
+            );
+        }
+
+        // Save uploaded file temporarily
+        const bytes = await cvFile.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+
+        const uploadDir = path.join(process.cwd(), 'uploads');
+        const fileName = `${Date.now()}-${cvFile.name}`;
+        cvFilePath = path.join(uploadDir, fileName);
+
+        // Ensure upload directory exists
+        const fs = require('fs');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+
+        await writeFile(cvFilePath, buffer);
+
+        // Import services
+        const textExtractor = require('@/utils/textExtractor');
+        const cvOptimizer = require('@/services/cvOptimizer');
+
+        // Extract text
+        const cvText = await textExtractor.extractFromFile(cvFilePath);
+        const analysisResults = JSON.parse(analysisResultsStr);
+
+        // Optimize
+        const optimizedData = await cvOptimizer.optimizeCV(
+            cvText,
+            jdText,
+            analysisResults,
+            optimizationLevel || 'honest'
+        );
+
+        // Clean up
+        if (cvFilePath) {
+            await unlink(cvFilePath);
+        }
+
+        return NextResponse.json({
+            success: true,
+            ...optimizedData
+        });
+
+    } catch (error: any) {
+        // Clean up on error
+        if (cvFilePath) {
+            try {
+                await unlink(cvFilePath);
+            } catch (e) {
+                console.error('Failed to delete file:', e);
+            }
+        }
+
+        console.error('Optimization error:', error);
+        return NextResponse.json(
+            { success: false, error: error.message },
+            { status: 500 }
+        );
+    }
+}
