@@ -11,8 +11,11 @@ class CVOptimizer {
             throw new Error('ANTHROPIC_API_KEY is not set in environment variables');
         }
 
+        // Trim whitespace/newlines from API key
+        const apiKey = process.env.ANTHROPIC_API_KEY.trim();
+
         this.client = new Anthropic({
-            apiKey: process.env.ANTHROPIC_API_KEY
+            apiKey: apiKey
         });
 
         this.model = 'claude-sonnet-4-20250514';
