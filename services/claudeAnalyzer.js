@@ -9,16 +9,15 @@ const weights = require('../config/weights.config');
 class ClaudeAnalyzer {
 
   constructor() {
-    console.log('Checking API key...');
-    console.log('API key exists:', !!process.env.ANTHROPIC_API_KEY);
-    console.log('API key starts with:', process.env.ANTHROPIC_API_KEY?.substring(0, 15));
-
     if (!process.env.ANTHROPIC_API_KEY) {
       throw new Error('ANTHROPIC_API_KEY is not set in environment variables');
     }
 
+    // Trim whitespace/newlines from API key
+    const apiKey = process.env.ANTHROPIC_API_KEY.trim();
+
     this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY
+      apiKey: apiKey
     });
 
     this.model = 'claude-sonnet-4-20250514'; // Using Claude Sonnet 4.5
