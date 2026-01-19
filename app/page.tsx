@@ -68,27 +68,7 @@ export default function Home() {
     }
   };
 
-  const handleDownloadPDF = async () => {
-    try {
-      const response = await axios.post(
-        '/api/generate-pdf',
-        { optimizedCV },
-        {
-          responseType: 'blob',
-        }
-      );
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Optimized_CV_${Date.now()}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (err: any) {
-      setError('PDF generation failed. Please try again.');
-    }
-  };
 
   const handleReset = () => {
     setCvFile(null);
@@ -160,7 +140,6 @@ export default function Home() {
         {step === 'optimized' && optimizedCV && (
           <OptimizationSection
             optimizedCV={optimizedCV}
-            onDownload={handleDownloadPDF}
             onReset={handleReset}
           />
         )}

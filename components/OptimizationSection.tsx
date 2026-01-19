@@ -1,16 +1,121 @@
 import React from 'react';
+import jsPDF from 'jspdf';
 
 interface OptimizationSectionProps {
   optimizedCV: any;
-  onDownload: () => void;
   onReset: () => void;
 }
 
 export default function OptimizationSection({
   optimizedCV,
-  onDownload,
   onReset,
 }: OptimizationSectionProps) {
+
+  const handleDownloadPDF = () => {
+    const cv = optimizedCV.optimizedCV;
+    const doc = new jsPDF();
+
+    let yPos = 20;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    const maxWidth = pageWidth - (margin * 2);
+
+    // Name
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text(cv.contactInfo.name, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 8;
+
+    // Contact Info
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const contactLine = `${cv.contactInfo.email} | ${cv.contactInfo.phone}`;
+    doc.text(contactLine, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
+
+    // Summary
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PROFESSIONAL SUMMARY', margin, yPos);
+    yPos += 6;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const summaryLines = doc.splitTextToSize(cv.summary, maxWidth);
+    doc.text(summaryLines, margin, yPos);
+    yPos += (summaryLines.length * 5) + 8;
+
+    // Skills
+    if (cv.skills?.technical?.length > 0) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('SKILLS', margin, yPos);
+      yPos += 6;
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Technical: ${cv.skills.technical.join(', ')}`, margin, yPos);
+      yPos += 10;
+    }
+
+    // Experience
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PROFESSIONAL EXPERIENCE', margin, yPos);
+    yPos += 6;
+
+    cv.experience.forEach((exp: any, index: number) => {
+      // Check if we need new page
+      if (yPos > 250) {
+        doc.addPage();
+        yPos = 20;
+      }
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${exp.title} | ${exp.company}`, margin, yPos);
+      yPos += 5;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.text(exp.duration, margin, yPos);
+      yPos += 6;
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      exp.achievements.forEach((achievement: string) => {
+        const lines = doc.splitTextToSize(`• ${achievement}`, maxWidth - 5);
+        doc.text(lines, margin + 5, yPos);
+        yPos += (lines.length * 5);
+      });
+      yPos += 5;
+    });
+
+    // Education
+    if (cv.education?.length > 0 && yPos < 250) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('EDUCATION', margin, yPos);
+      yPos += 6;
+
+      cv.education.forEach((edu: any) => {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${edu.degree} | ${edu.institution}`, margin, yPos);
+        yPos += 5;
+
+        if (edu.year) {
+          doc.setFont('helvetica', 'italic');
+          doc.text(edu.year, margin, yPos);
+          yPos += 6;
+        }
+      });
+    }
+
+    // Download
+    doc.save(`Optimized_CV_${Date.now()}.pdf`);
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       {/* Success Message */}
@@ -90,43 +195,10 @@ export default function OptimizationSection({
         </div>
       )}
 
-      {/* CV Preview */}
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">CV Preview</h3>
-        <div className="bg-gray-50 rounded-lg p-6 max-h-96 overflow-y-auto">
-          <div className="prose prose-sm max-w-none">
-            {optimizedCV.optimizedCV && (
-              <>
-                {/* Contact Info */}
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl font-bold">{optimizedCV.optimizedCV.contactInfo.name}</h2>
-                  <p className="text-gray-600">
-                    {optimizedCV.optimizedCV.contactInfo.email} | {optimizedCV.optimizedCV.contactInfo.phone}
-                  </p>
-                </div>
-
-                {/* Summary */}
-                {optimizedCV.optimizedCV.summary && (
-                  <div className="mb-4">
-                    <h3 className="text-lg font-bold">Professional Summary</h3>
-                    <p>{optimizedCV.optimizedCV.summary}</p>
-                  </div>
-                )}
-
-                {/* This is a simplified preview - the full PDF will have complete formatting */}
-                <p className="text-sm text-gray-500 italic mt-4">
-                  Preview is simplified. Download PDF for the complete formatted version.
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Download Actions */}
       <div className="flex justify-center gap-4">
         <button
-          onClick={onDownload}
+          onClick={handleDownloadPDF}
           className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
         >
           <span className="flex items-center">
