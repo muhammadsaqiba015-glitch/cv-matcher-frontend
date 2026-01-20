@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
             const resend = new Resend(process.env.RESEND_API_KEY);
             const emailResult = await resend.emails.send({
                 from: 'CV Matcher <onboarding@resend.dev>',
-                to: 'Muhammadsaqiba015@gmail.com', // REPLACE WITH YOUR EMAIL
+                to: 'muhammadsaqiba015@gmail.com', // REPLACE WITH YOUR EMAIL
                 subject: '🎯 New CV Analyzed!',
                 html: `
           <h2>Someone just analyzed their CV!</h2>
