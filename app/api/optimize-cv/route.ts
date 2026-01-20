@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, unlink } from 'fs/promises';
 import path from 'path';
+import { Resend } from 'resend';
 
 export async function POST(request: NextRequest) {
     let cvFilePath: string | null = null;
@@ -27,8 +28,6 @@ export async function POST(request: NextRequest) {
         const fileName = `${Date.now()}-${cvFile.name}`;
         cvFilePath = path.join(uploadDir, fileName);
 
-
-
         await writeFile(cvFilePath, buffer);
 
         // Import services
@@ -37,19 +36,37 @@ export async function POST(request: NextRequest) {
 
         // Extract text
         const cvText = await textExtractor.extractFromFile(cvFilePath);
-        const analysisResults = JSON.parse(analysisResultsStr);
+        const parsedResults = JSON.parse(analysisResultsStr);
 
         // Optimize
         const optimizedData = await cvOptimizer.optimizeCV(
             cvText,
             jdText,
-            analysisResults,
+            parsedResults,
             optimizationLevel || 'honest'
         );
 
         // Clean up
         if (cvFilePath) {
             await unlink(cvFilePath);
+        }
+
+        // Send email notification
+        try {
+            const resend = new Resend(process.env.RESEND_API_KEY);
+            await resend.emails.send({
+                from: 'CV Matcher <onboarding@resend.dev>',
+                to: 'Muhammadsaqiba015@gmail.com', // REPLACE WITH YOUR EMAIL
+                subject: '📄 New CV Generated!',
+                html: `
+          <h2>Someone just generated an optimized CV!</h2>
+          <p><strong>Optimization Level:</strong> ${optimizationLevel || 'honest'}</p>
+          <p><strong>Changes Made:</strong> ${optimizedData.changesSummary?.totalChanges || 0}</p>
+          <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+        `
+            });
+        } catch (emailError) {
+            console.error('Email notification failed:', emailError);
         }
 
         return NextResponse.json({
