@@ -61,9 +61,6 @@ export default function Home() {
       }
 
       console.log('Analysis results:', data);
-      console.log('Strengths:', data.strengths);
-      console.log('Weaknesses:', data.weaknesses);
-
       setResults(data);
     } catch (err: any) {
       console.error('Analysis error:', err);
@@ -74,8 +71,13 @@ export default function Home() {
   };
 
   const handleOptimize = async (level: 'honest' | 'aggressive') => {
-    if (!cvFile || !jdText.trim()) {
-      setError('CV file and job description are required for optimization');
+    if (!cvFile) {
+      setError('CV file is missing. Please go back and upload again.');
+      return;
+    }
+
+    if (!jdText.trim()) {
+      setError('Job description is missing.');
       return;
     }
 
@@ -87,16 +89,36 @@ export default function Home() {
       formData.append('cvFile', cvFile);
       formData.append('jdText', jdText);
       formData.append('level', level);
-      formData.append('analysisResults', JSON.stringify(results));
+
+      // Safely stringify results
+      if (results) {
+        formData.append('analysisResults', JSON.stringify({
+          interviewChance: results.interviewChance || 50,
+          strengths: results.strengths || [],
+          weaknesses: results.weaknesses || []
+        }));
+      }
 
       const response = await fetch('/api/optimize', {
         method: 'POST',
         body: formData,
       });
 
+      // Check if response is ok before parsing
+      if (!response.ok) {
+        let errorMessage = 'Optimization failed';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          errorMessage = await response.text() || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
       const data = await response.json();
 
-      if (!response.ok || !data.success) {
+      if (!data.success) {
         throw new Error(data.error || 'Optimization failed');
       }
 
