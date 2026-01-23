@@ -11,6 +11,7 @@ export default function Home() {
   const [step, setStep] = useState<'upload' | 'analyzing' | 'results' | 'optimizing' | 'optimized'>('upload');
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState('');
+  const [analysisMethod, setAnalysisMethod] = useState('both'); // NEW: Default to 'both'
   const [analysisResults, setAnalysisResults] = useState<any>(null);
   const [optimizedCV, setOptimizedCV] = useState<any>(null);
   const [error, setError] = useState('');
@@ -28,6 +29,7 @@ export default function Home() {
       const formData = new FormData();
       formData.append('cvFile', cvFile);
       formData.append('jdText', jobDescription);
+      formData.append('analysisMethod', analysisMethod); // NEW: Send analysis method
 
       const response = await axios.post('/api/analyze-files', formData, {
         headers: {
@@ -71,6 +73,7 @@ export default function Home() {
   const handleReset = () => {
     setCvFile(null);
     setJobDescription('');
+    setAnalysisMethod('both');
     setAnalysisResults(null);
     setOptimizedCV(null);
     setError('');
@@ -137,6 +140,8 @@ export default function Home() {
             jobDescription={jobDescription}
             setJobDescription={setJobDescription}
             onAnalyze={handleAnalyze}
+            analysisMethod={analysisMethod}
+            setAnalysisMethod={setAnalysisMethod}
           />
         )}
 

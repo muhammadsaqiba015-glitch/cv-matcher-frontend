@@ -17,101 +17,241 @@ export default function OptimizationSection({
 
     let yPos = 20;
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 20;
     const maxWidth = pageWidth - (margin * 2);
+    const lineHeight = 6;
 
-    // Name
-    doc.setFontSize(20);
+    // Helper function to check if we need a new page
+    const checkPageBreak = (requiredSpace: number) => {
+      if (yPos + requiredSpace > pageHeight - 20) {
+        doc.addPage();
+        yPos = 20;
+        return true;
+      }
+      return false;
+    };
+
+    // Helper function to draw a horizontal line
+    const drawLine = (y: number, color: string = '#3B82F6') => {
+      doc.setDrawColor(color);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, pageWidth - margin, y);
+    };
+
+    // Helper function for section headers
+    const addSectionHeader = (title: string) => {
+      checkPageBreak(15);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(59, 130, 246); // Blue color
+      doc.text(title.toUpperCase(), margin, yPos);
+      yPos += 3;
+      drawLine(yPos, '#3B82F6');
+      yPos += 8;
+      doc.setTextColor(0, 0, 0); // Reset to black
+    };
+
+    // ============ HEADER - Name and Contact ============
+    doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(31, 41, 55); // Dark gray
     doc.text(cv.contactInfo.name, pageWidth / 2, yPos, { align: 'center' });
     yPos += 8;
 
-    // Contact Info
+    // Contact info
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(75, 85, 99); // Medium gray
     const contactLine = `${cv.contactInfo.email} | ${cv.contactInfo.phone}`;
     doc.text(contactLine, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 5;
+
+    // Horizontal line under header
+    drawLine(yPos, '#E5E7EB');
     yPos += 10;
 
-    // Summary
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('PROFESSIONAL SUMMARY', margin, yPos);
-    yPos += 6;
+    // ============ PROFESSIONAL SUMMARY ============
+    addSectionHeader('Professional Summary');
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(55, 65, 81);
     const summaryLines = doc.splitTextToSize(cv.summary, maxWidth);
-    doc.text(summaryLines, margin, yPos);
-    yPos += (summaryLines.length * 5) + 8;
+    summaryLines.forEach((line: string) => {
+      checkPageBreak(lineHeight);
+      doc.text(line, margin, yPos);
+      yPos += lineHeight;
+    });
+    yPos += 5;
 
-    // Skills
-    if (cv.skills?.technical?.length > 0) {
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('SKILLS', margin, yPos);
-      yPos += 6;
+    // ============ SKILLS ============
+    if (cv.skills?.technical?.length > 0 || cv.skills?.soft?.length > 0) {
+      addSectionHeader('Core Competencies');
 
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Technical: ${cv.skills.technical.join(', ')}`, margin, yPos);
-      yPos += 10;
-    }
 
-    // Experience
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('PROFESSIONAL EXPERIENCE', margin, yPos);
-    yPos += 6;
+      if (cv.skills.technical?.length > 0) {
+        checkPageBreak(15);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Technical Skills:', margin, yPos);
+        yPos += lineHeight;
 
-    cv.experience.forEach((exp: any) => {
-      if (yPos > 250) {
-        doc.addPage();
-        yPos = 20;
+        doc.setFont('helvetica', 'normal');
+        const techSkills = cv.skills.technical.join(' • ');
+        const techLines = doc.splitTextToSize(techSkills, maxWidth - 5);
+        techLines.forEach((line: string) => {
+          checkPageBreak(lineHeight);
+          doc.text(line, margin + 5, yPos);
+          yPos += lineHeight;
+        });
+        yPos += 3;
       }
 
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${exp.title} | ${exp.company}`, margin, yPos);
+      if (cv.skills.soft?.length > 0) {
+        checkPageBreak(15);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Professional Skills:', margin, yPos);
+        yPos += lineHeight;
+
+        doc.setFont('helvetica', 'normal');
+        const softSkills = cv.skills.soft.join(' • ');
+        const softLines = doc.splitTextToSize(softSkills, maxWidth - 5);
+        softLines.forEach((line: string) => {
+          checkPageBreak(lineHeight);
+          doc.text(line, margin + 5, yPos);
+          yPos += lineHeight;
+        });
+      }
+
       yPos += 5;
+    }
 
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'italic');
-      doc.text(exp.duration, margin, yPos);
-      yPos += 6;
+    // ============ PROFESSIONAL EXPERIENCE ============
+    if (cv.experience?.length > 0) {
+      addSectionHeader('Professional Experience');
 
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      exp.achievements.forEach((achievement: string) => {
-        const lines = doc.splitTextToSize(`• ${achievement}`, maxWidth - 5);
-        doc.text(lines, margin + 5, yPos);
-        yPos += (lines.length * 5);
-      });
-      yPos += 5;
-    });
+      cv.experience.forEach((exp: any, index: number) => {
+        checkPageBreak(30);
 
-    // Education
-    if (cv.education?.length > 0 && yPos < 250) {
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('EDUCATION', margin, yPos);
-      yPos += 6;
+        // Job title and company
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(31, 41, 55);
+        doc.text(exp.title, margin, yPos);
+        yPos += lineHeight;
 
-      cv.education.forEach((edu: any) => {
+        // Company and duration
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
-        doc.text(`${edu.degree} | ${edu.institution}`, margin, yPos);
-        yPos += 5;
+        doc.setTextColor(59, 130, 246); // Blue
+        doc.text(exp.company, margin, yPos);
+
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(107, 114, 128); // Gray
+        doc.text(exp.duration, pageWidth - margin, yPos, { align: 'right' });
+        yPos += lineHeight + 2;
+
+        // Achievements
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(55, 65, 81);
+
+        exp.achievements.forEach((achievement: string, achIndex: number) => {
+          checkPageBreak(20);
+
+          // Bullet point
+          doc.setFontSize(12);
+          doc.text('•', margin + 2, yPos);
+          doc.setFontSize(10);
+
+          // Achievement text
+          const achievementLines = doc.splitTextToSize(achievement, maxWidth - 10);
+          achievementLines.forEach((line: string, lineIndex: number) => {
+            if (lineIndex > 0) checkPageBreak(lineHeight);
+            doc.text(line, margin + 8, yPos);
+            yPos += lineHeight;
+          });
+        });
+
+        // Add spacing between jobs
+        if (index < cv.experience.length - 1) {
+          yPos += 5;
+          // Light separator line
+          doc.setDrawColor(229, 231, 235);
+          doc.setLineWidth(0.3);
+          doc.line(margin + 10, yPos, pageWidth - margin - 10, yPos);
+          yPos += 5;
+        }
+      });
+
+      yPos += 5;
+    }
+
+    // ============ EDUCATION ============
+    if (cv.education?.length > 0) {
+      addSectionHeader('Education');
+
+      cv.education.forEach((edu: any, index: number) => {
+        checkPageBreak(20);
+
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(31, 41, 55);
+        doc.text(edu.degree, margin, yPos);
+        yPos += lineHeight;
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(59, 130, 246);
+        doc.text(edu.institution, margin, yPos);
 
         if (edu.year) {
-          doc.setFont('helvetica', 'italic');
-          doc.text(edu.year, margin, yPos);
-          yPos += 6;
+          doc.setTextColor(107, 114, 128);
+          doc.text(edu.year, pageWidth - margin, yPos, { align: 'right' });
+        }
+
+        if (index < cv.education.length - 1) {
+          yPos += lineHeight + 3;
+        } else {
+          yPos += lineHeight;
         }
       });
     }
 
-    doc.save(`Optimized_CV_${Date.now()}.pdf`);
+    // ============ CERTIFICATIONS (if exists) ============
+    if (cv.certifications?.length > 0) {
+      yPos += 5;
+      addSectionHeader('Certifications');
+
+      cv.certifications.forEach((cert: any) => {
+        checkPageBreak(10);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(55, 65, 81);
+        doc.text(`• ${cert}`, margin + 2, yPos);
+        yPos += lineHeight;
+      });
+    }
+
+    // ============ FOOTER ============
+    const totalPages = doc.internal.pages.length - 1;
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(156, 163, 175);
+      doc.setFont('helvetica', 'italic');
+      doc.text(
+        `${cv.contactInfo.name} - Page ${i} of ${totalPages}`,
+        pageWidth / 2,
+        pageHeight - 10,
+        { align: 'center' }
+      );
+    }
+
+    // Save the PDF
+    doc.save(`${cv.contactInfo.name}_CV_Optimized.pdf`);
   };
 
   return (
@@ -242,7 +382,7 @@ export default function OptimizationSection({
             <svg className="w-6 h-6 mr-3 group-hover:translate-y-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            Download Optimized CV
+            Download Professional CV
           </span>
         </button>
         <button

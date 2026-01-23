@@ -6,6 +6,8 @@ interface UploadSectionProps {
   jobDescription: string;
   setJobDescription: (jd: string) => void;
   onAnalyze: () => void;
+  analysisMethod: string;
+  setAnalysisMethod: (method: string) => void;
 }
 
 export default function UploadSection({
@@ -14,6 +16,8 @@ export default function UploadSection({
   jobDescription,
   setJobDescription,
   onAnalyze,
+  analysisMethod,
+  setAnalysisMethod,
 }: UploadSectionProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -143,6 +147,95 @@ export default function UploadSection({
                 </p>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Analysis Method Selection */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-300 mb-4 flex items-center">
+            <span className="w-8 h-8 bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg flex items-center justify-center mr-3 text-white font-bold">
+              3
+            </span>
+            Choose Analysis Method
+          </label>
+
+          <div className="grid md:grid-cols-3 gap-4">
+            <button
+              type="button"
+              onClick={() => setAnalysisMethod('keyword')}
+              className={`p-6 rounded-xl border-2 transition-all duration-300 text-left ${analysisMethod === 'keyword'
+                ? 'border-blue-500 bg-gradient-to-br from-blue-500/20 to-blue-600/10 glass-card'
+                : 'border-white/10 glass hover:border-blue-500/50'
+                }`}
+            >
+              <div className="flex items-center mb-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${analysisMethod === 'keyword' ? 'bg-blue-500/30' : 'bg-white/10'
+                  }`}>
+                  <svg className="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                    <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                {analysisMethod === 'keyword' && (
+                  <svg className="w-5 h-5 text-green-400 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+              <h4 className="font-bold text-white mb-2">Keyword Match</h4>
+              <p className="text-sm text-gray-400">Fast analysis based on keyword matching</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAnalysisMethod('ai')}
+              className={`p-6 rounded-xl border-2 transition-all duration-300 text-left ${analysisMethod === 'ai'
+                ? 'border-purple-500 bg-gradient-to-br from-purple-500/20 to-purple-600/10 glass-card'
+                : 'border-white/10 glass hover:border-purple-500/50'
+                }`}
+            >
+              <div className="flex items-center mb-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${analysisMethod === 'ai' ? 'bg-purple-500/30' : 'bg-white/10'
+                  }`}>
+                  <svg className="w-5 h-5 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M13 7H7v6h6V7z" />
+                    <path fillRule="evenodd" d="M7 2a1 1 0 012 0v1h2V2a1 1 0 112 0v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v2h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H9v1a1 1 0 11-2 0v-1H5a2 2 0 01-2-2v-2H2a1 1 0 110-2h1V9H2a1 1 0 010-2h1V5a2 2 0 012-2h2V2zM5 5h10v10H5V5z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                {analysisMethod === 'ai' && (
+                  <svg className="w-5 h-5 text-green-400 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+              <h4 className="font-bold text-white mb-2">AI Analysis</h4>
+              <p className="text-sm text-gray-400">Deep AI-powered contextual analysis</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAnalysisMethod('both')}
+              className={`p-6 rounded-xl border-2 transition-all duration-300 text-left ${analysisMethod === 'both'
+                ? 'border-pink-500 bg-gradient-to-br from-pink-500/20 to-pink-600/10 glass-card'
+                : 'border-white/10 glass hover:border-pink-500/50'
+                }`}
+            >
+              <div className="flex items-center mb-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${analysisMethod === 'both' ? 'bg-pink-500/30' : 'bg-white/10'
+                  }`}>
+                  <svg className="w-5 h-5 text-pink-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                {analysisMethod === 'both' && (
+                  <svg className="w-5 h-5 text-green-400 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+              <h4 className="font-bold text-white mb-2">Hybrid (Best) ⚡</h4>
+              <p className="text-sm text-gray-400">Combined approach for 80%+ accuracy</p>
+            </button>
           </div>
         </div>
 
