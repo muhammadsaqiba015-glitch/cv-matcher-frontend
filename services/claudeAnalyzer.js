@@ -2,8 +2,15 @@ const Anthropic = require('@anthropic-ai/sdk');
 
 class ClaudeAnalyzer {
   constructor() {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      throw new Error('ANTHROPIC_API_KEY is not set in environment variables');
+    }
+
+    // Trim whitespace/newlines from API key
+    const apiKey = process.env.ANTHROPIC_API_KEY.trim();
+
     this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY
+      apiKey: apiKey
     });
   }
 
@@ -106,7 +113,13 @@ IMPORTANT RULES:
 
     } catch (error) {
       console.error('Claude analysis error:', error);
-      // Return default structure with empty arrays that will show "none identified"
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        name: error.name
+      });
+
+      // Return default structure on error
       return {
         overallScore: 50,
         aspects: {
@@ -138,7 +151,7 @@ ORIGINAL CV:
 ${cvText}
 
 ANALYSIS RESULTS:
-- Current Score: ${analysisResults.interviewChance || analysisResults.finalScore}%
+- Current Score: ${analysisResults.interviewChance || analysisResults.finalScore || 50}%
 - Missing/Weak Areas: ${analysisResults.weaknesses?.join(', ') || 'None identified'}
 - Strengths: ${analysisResults.strengths?.join(', ') || 'None identified'}
 
@@ -210,7 +223,12 @@ Provide the optimized CV in this JSON format ONLY:
 
     } catch (error) {
       console.error('CV optimization error:', error);
-      throw error;
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        name: error.name
+      });
+      throw new Error(`CV optimization failed: ${error.message}`);
     }
   }
 }
