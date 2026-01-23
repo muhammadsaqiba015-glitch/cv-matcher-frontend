@@ -54,7 +54,15 @@ export default function Home() {
         body: formData,
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        console.error('Failed to parse response:', responseText);
+        throw new Error('Invalid response from server');
+      }
 
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Analysis failed');
@@ -104,21 +112,18 @@ export default function Home() {
         body: formData,
       });
 
-      // Check if response is ok before parsing
-      if (!response.ok) {
-        let errorMessage = 'Optimization failed';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        } catch {
-          errorMessage = await response.text() || errorMessage;
-        }
-        throw new Error(errorMessage);
+      // Read response body only once
+      const responseText = await response.text();
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        console.error('Failed to parse response:', responseText);
+        throw new Error('Invalid response from server');
       }
 
-      const data = await response.json();
-
-      if (!data.success) {
+      if (!response.ok || !data.success) {
         throw new Error(data.error || 'Optimization failed');
       }
 
