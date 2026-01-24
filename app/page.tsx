@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import ResultsDisplay from '../components/ResultsDisplay';
+import OptimizationSection from '../components/OptimizationSection';
 
 export default function Home() {
   const [cvFile, setCvFile] = useState<File | null>(null);
@@ -98,7 +99,6 @@ export default function Home() {
       formData.append('jdText', jdText);
       formData.append('level', level);
 
-      // Safely stringify results
       if (results) {
         formData.append('analysisResults', JSON.stringify({
           interviewChance: results.interviewChance || 50,
@@ -112,7 +112,6 @@ export default function Home() {
         body: formData,
       });
 
-      // Read response body only once
       const responseText = await response.text();
 
       let data;
@@ -145,12 +144,6 @@ export default function Home() {
     setError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
-    }
-  };
-
-  const copyOptimizedCV = () => {
-    if (optimizedCV?.optimizedCV) {
-      navigator.clipboard.writeText(optimizedCV.optimizedCV);
     }
   };
 
@@ -287,67 +280,19 @@ export default function Home() {
               Analyze Another CV
             </button>
 
+            {/* Show results - but hide optimize button if fake */}
             <ResultsDisplay
               results={results}
-              onOptimize={handleOptimize}
+              onOptimize={results.isFake ? undefined : handleOptimize}
               isOptimizing={isOptimizing}
             />
 
+            {/* Show optimized CV if available */}
             {optimizedCV && (
-              <div className="glass-card rounded-2xl p-8 border border-green-500/30 animate-fade-in">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-2xl font-bold text-white flex items-center">
-                    <span className="w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center mr-3">
-                      ✨
-                    </span>
-                    Optimized CV
-                  </h3>
-                  <div className="flex items-center space-x-4">
-                    <span className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg font-medium">
-                      Expected Score: {optimizedCV.expectedScore}%
-                    </span>
-                    <button
-                      onClick={copyOptimizedCV}
-                      className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"
-                    >
-                      📋 Copy
-                    </button>
-                  </div>
-                </div>
-
-                {optimizedCV.changes && optimizedCV.changes.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-lg font-semibold text-white mb-3">Changes Made:</h4>
-                    <ul className="space-y-2">
-                      {optimizedCV.changes.map((change: string, index: number) => (
-                        <li key={index} className="flex items-start text-gray-300">
-                          <span className="text-green-400 mr-2">•</span>
-                          {change}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {optimizedCV.keywordsAdded && optimizedCV.keywordsAdded.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-lg font-semibold text-white mb-3">Keywords Added:</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {optimizedCV.keywordsAdded.map((keyword: string, index: number) => (
-                        <span key={index} className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-sm">
-                          + {keyword}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-white/5 rounded-xl p-6 max-h-96 overflow-y-auto">
-                  <pre className="text-gray-300 whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                    {optimizedCV.optimizedCV}
-                  </pre>
-                </div>
-              </div>
+              <OptimizationSection
+                optimizedCV={optimizedCV}
+                onReset={handleReset}
+              />
             )}
 
             {error && (

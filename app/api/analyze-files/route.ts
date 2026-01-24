@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, unlink } from 'fs/promises';
 import path from 'path';
 
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
     let cvFilePath: string | null = null;
 
@@ -17,7 +19,6 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Save uploaded file temporarily
         const bytes = await cvFile.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
@@ -27,13 +28,11 @@ export async function POST(request: NextRequest) {
 
         await writeFile(cvFilePath, buffer);
 
-        // Import services
         const textExtractor = require('@/utils/textExtractor');
         const keywordMatcher = require('@/services/keywordMatcher');
         const claudeAnalyzer = require('@/services/claudeAnalyzer');
         const scoreCalculator = require('@/services/scoreCalculator');
 
-        // Extract text from CV
         console.log('Extracting text from CV...');
         const cvText = await textExtractor.extractFromFile(cvFilePath);
 
@@ -44,35 +43,50 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Phase 1: Keyword Matching
-        console.log('Running keyword analysis...');
-        const keywordResults = keywordMatcher.analyze(jdText, cvText);
-
-        // Phase 2: AI Analysis
         console.log('Running AI analysis...');
         const aiResults = await claudeAnalyzer.analyze(jdText, cvText);
 
-        // Calculate final score and merge results
+        // Check if AI detected fake document
+        if (aiResults.isFake) {
+            if (cvFilePath) {
+                try { await unlink(cvFilePath); } catch (e) { }
+            }
+
+            return NextResponse.json({
+                success: true,
+                isFake: true,
+                interviewChance: 0,
+                recommendation: {
+                    level: '🚫 Invalid Document',
+                    message: aiResults.summary
+                },
+                breakdown: { keywordScore: 0, aiScore: 0 },
+                aspects: aiResults.aspects,
+                strengths: [],
+                weaknesses: [],
+                summary: aiResults.summary,
+                detailedAssessment: aiResults.detailedAssessment,
+                fakeReason: aiResults.fakeReason
+            });
+        }
+
+        console.log('Running keyword analysis...');
+        const keywordResults = keywordMatcher.analyze(jdText, cvText);
+
         console.log('Calculating final score...');
         const finalResults = scoreCalculator.calculate(keywordResults, aiResults);
 
-        // Clean up temporary file
         if (cvFilePath) {
-            try {
-                await unlink(cvFilePath);
-            } catch (e) {
-                console.warn('Could not delete temp file:', e);
-            }
+            try { await unlink(cvFilePath); } catch (e) { }
         }
 
-        console.log('Analysis complete!');
-        console.log('Final Score:', finalResults.finalScore);
-        console.log('Strengths count:', finalResults.strengths?.length);
-        console.log('Weaknesses count:', finalResults.weaknesses?.length);
+        console.log('Analysis complete! Score:', finalResults.finalScore);
+        console.log('Strengths:', finalResults.strengths?.length);
+        console.log('Weaknesses:', finalResults.weaknesses?.length);
 
-        // Return comprehensive results
         return NextResponse.json({
             success: true,
+            isFake: false,
             interviewChance: finalResults.finalScore,
             recommendation: finalResults.recommendation,
             breakdown: finalResults.breakdown,
@@ -92,21 +106,12 @@ export async function POST(request: NextRequest) {
     } catch (error: any) {
         console.error('Analysis error:', error);
 
-        // Clean up on error
         if (cvFilePath) {
-            try {
-                await unlink(cvFilePath);
-            } catch (e) {
-                // Ignore cleanup errors
-            }
+            try { await unlink(cvFilePath); } catch (e) { }
         }
 
         return NextResponse.json(
-            {
-                success: false,
-                error: error.message || 'Analysis failed',
-                details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-            },
+            { success: false, error: error.message || 'Analysis failed' },
             { status: 500 }
         );
     }

@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 interface ResultsDisplayProps {
     results: {
         interviewChance: number;
+        isFake?: boolean;
         recommendation: {
             level: string;
             message: string;
@@ -24,13 +25,33 @@ interface ResultsDisplayProps {
             matchPercentage: number;
         };
     };
-    onOptimize: (level: 'honest' | 'aggressive') => void;
+    onOptimize?: (level: 'honest' | 'aggressive') => void;
     isOptimizing: boolean;
 }
 
 export default function ResultsDisplay({ results, onOptimize, isOptimizing }: ResultsDisplayProps) {
     const [showOptimizeOptions, setShowOptimizeOptions] = useState(false);
     const [showKeywordDetails, setShowKeywordDetails] = useState(false);
+
+    // If fake document, show the humorous message
+    if (results.isFake) {
+        return (
+            <div className="glass-card rounded-3xl p-8 border border-red-500/30 text-center animate-fade-in">
+                <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <span className="text-5xl">🤨</span>
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-4">{results.recommendation.level}</h2>
+                <p className="text-gray-300 text-lg leading-relaxed max-w-2xl mx-auto">
+                    {results.summary}
+                </p>
+                <div className="mt-8 p-4 bg-white/5 rounded-xl">
+                    <p className="text-gray-400 text-sm">
+                        💡 <strong>Tip:</strong> Upload a real CV (PDF, DOCX, or TXT) and paste an actual job description to get meaningful analysis!
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     const getScoreColor = (score: number) => {
         if (score >= 80) return 'from-green-400 to-emerald-600';
@@ -289,95 +310,97 @@ export default function ResultsDisplay({ results, onOptimize, isOptimizing }: Re
                 )}
             </div>
 
-            {/* Optimize CTA */}
-            <div className="relative glass-card rounded-3xl p-10 border-2 border-purple-500/30 overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-purple-600/20 via-blue-600/20 to-pink-600/20 opacity-50"></div>
+            {/* Optimize CTA - Only show if onOptimize is provided */}
+            {onOptimize && (
+                <div className="relative glass-card rounded-3xl p-10 border-2 border-purple-500/30 overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-purple-600/20 via-blue-600/20 to-pink-600/20 opacity-50"></div>
 
-                {!showOptimizeOptions ? (
-                    <div className="relative text-center">
-                        <h3 className="text-3xl font-bold text-white mb-4">Want to Improve Your Score?</h3>
-                        <p className="text-gray-300 mb-8 max-w-xl mx-auto">
-                            Let our AI optimize your CV to better match this job description. Choose between honest improvements or aggressive optimization for maximum match.
-                        </p>
-                        <button
-                            onClick={() => setShowOptimizeOptions(true)}
-                            className="px-10 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all duration-300 transform hover:scale-105 shadow-xl"
-                        >
-                            🚀 Optimize My CV
-                        </button>
-                    </div>
-                ) : (
-                    <div className="relative">
-                        <h3 className="text-2xl font-bold text-white mb-6 text-center">Choose Optimization Level</h3>
-                        <div className="grid md:grid-cols-2 gap-6">
-                            {/* Honest Option */}
+                    {!showOptimizeOptions ? (
+                        <div className="relative text-center">
+                            <h3 className="text-3xl font-bold text-white mb-4">Want to Improve Your Score?</h3>
+                            <p className="text-gray-300 mb-8 max-w-xl mx-auto">
+                                Let our AI optimize your CV to better match this job description. Choose between honest improvements or aggressive optimization for maximum match.
+                            </p>
                             <button
-                                onClick={() => onOptimize('honest')}
-                                disabled={isOptimizing}
-                                className="p-6 glass rounded-2xl border border-blue-500/30 hover:border-blue-500/60 transition-all duration-300 text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => setShowOptimizeOptions(true)}
+                                className="px-10 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all duration-300 transform hover:scale-105 shadow-xl"
                             >
-                                <div className="flex items-center mb-4">
-                                    <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mr-4">
-                                        <span className="text-2xl">🎯</span>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-xl font-bold text-white">Honest</h4>
-                                        <p className="text-sm text-blue-400">Recommended</p>
-                                    </div>
-                                </div>
-                                <p className="text-gray-400 text-sm">
-                                    Reword existing experience to match job terminology. No exaggeration or false claims. Maintain authenticity.
-                                </p>
-                                <div className="mt-4 text-blue-400 text-sm font-medium group-hover:text-blue-300">
-                                    Expected improvement: 10-20% →
-                                </div>
-                            </button>
-
-                            {/* Aggressive Option */}
-                            <button
-                                onClick={() => onOptimize('aggressive')}
-                                disabled={isOptimizing}
-                                className="p-6 glass rounded-2xl border border-orange-500/30 hover:border-orange-500/60 transition-all duration-300 text-left group disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <div className="flex items-center mb-4">
-                                    <div className="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center mr-4">
-                                        <span className="text-2xl">⚡</span>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-xl font-bold text-white">Aggressive</h4>
-                                        <p className="text-sm text-orange-400">Maximum Match</p>
-                                    </div>
-                                </div>
-                                <p className="text-gray-400 text-sm">
-                                    Add ALL keywords from job description. Rewrite everything to perfectly align. Target: <strong className="text-orange-400">100% match</strong>.
-                                </p>
-                                <div className="mt-4 text-orange-400 text-sm font-medium group-hover:text-orange-300">
-                                    Target: 95-100% match →
-                                </div>
+                                🚀 Optimize My CV
                             </button>
                         </div>
+                    ) : (
+                        <div className="relative">
+                            <h3 className="text-2xl font-bold text-white mb-6 text-center">Choose Optimization Level</h3>
+                            <div className="grid md:grid-cols-2 gap-6">
+                                {/* Honest Option */}
+                                <button
+                                    onClick={() => onOptimize('honest')}
+                                    disabled={isOptimizing}
+                                    className="p-6 glass rounded-2xl border border-blue-500/30 hover:border-blue-500/60 transition-all duration-300 text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <div className="flex items-center mb-4">
+                                        <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mr-4">
+                                            <span className="text-2xl">🎯</span>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xl font-bold text-white">Honest</h4>
+                                            <p className="text-sm text-blue-400">Recommended</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-gray-400 text-sm">
+                                        Reword existing experience to match job terminology. No exaggeration or false claims. Maintain authenticity.
+                                    </p>
+                                    <div className="mt-4 text-blue-400 text-sm font-medium group-hover:text-blue-300">
+                                        Expected improvement: 10-20% →
+                                    </div>
+                                </button>
 
-                        {isOptimizing && (
-                            <div className="mt-6 text-center">
-                                <div className="inline-flex items-center px-6 py-3 glass rounded-xl">
-                                    <svg className="animate-spin h-5 w-5 mr-3 text-purple-400" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                    </svg>
-                                    <span className="text-white font-medium">Optimizing your CV...</span>
-                                </div>
+                                {/* Aggressive Option */}
+                                <button
+                                    onClick={() => onOptimize('aggressive')}
+                                    disabled={isOptimizing}
+                                    className="p-6 glass rounded-2xl border border-orange-500/30 hover:border-orange-500/60 transition-all duration-300 text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <div className="flex items-center mb-4">
+                                        <div className="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center mr-4">
+                                            <span className="text-2xl">⚡</span>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xl font-bold text-white">Aggressive</h4>
+                                            <p className="text-sm text-orange-400">Maximum Match</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-gray-400 text-sm">
+                                        Add ALL keywords from job description. Rewrite everything to perfectly align. Target: <strong className="text-orange-400">100% match</strong>.
+                                    </p>
+                                    <div className="mt-4 text-orange-400 text-sm font-medium group-hover:text-orange-300">
+                                        Target: 95-100% match →
+                                    </div>
+                                </button>
                             </div>
-                        )}
 
-                        <button
-                            onClick={() => setShowOptimizeOptions(false)}
-                            className="mt-6 text-gray-400 hover:text-white transition-colors text-sm mx-auto block"
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                )}
-            </div>
+                            {isOptimizing && (
+                                <div className="mt-6 text-center">
+                                    <div className="inline-flex items-center px-6 py-3 glass rounded-xl">
+                                        <svg className="animate-spin h-5 w-5 mr-3 text-purple-400" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        <span className="text-white font-medium">Optimizing your CV...</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={() => setShowOptimizeOptions(false)}
+                                className="mt-6 text-gray-400 hover:text-white transition-colors text-sm mx-auto block"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
