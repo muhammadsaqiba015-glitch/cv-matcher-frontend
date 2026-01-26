@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 
 interface StructuredCV {
   name: string;
@@ -45,7 +45,6 @@ export default function OptimizationSection({
 }: OptimizationSectionProps) {
   const [copied, setCopied] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const cvRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(optimizedCV.optimizedCV || '');
@@ -66,7 +65,8 @@ export default function OptimizationSection({
 
     try {
       // Dynamically import html2pdf
-      const html2pdf = (await import('html2pdf.js')).default;
+      const html2pdfModule = await import('html2pdf.js');
+      const html2pdf = html2pdfModule.default;
 
       // Create HTML content
       const htmlContent = `
@@ -150,20 +150,20 @@ export default function OptimizationSection({
       element.style.left = '-9999px';
       document.body.appendChild(element);
 
-      // PDF options
+      // PDF options with proper types
       const opt = {
         margin: 0,
         filename: `${cv.name.replace(/\s+/g, '_')}_CV_Professional.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
+        image: { type: 'jpeg' as const, quality: 0.98 },
         html2canvas: {
           scale: 2,
           useCORS: true,
           letterRendering: true
         },
         jsPDF: {
-          unit: 'mm',
-          format: 'a4',
-          orientation: 'portrait'
+          unit: 'mm' as const,
+          format: 'a4' as const,
+          orientation: 'portrait' as const
         }
       };
 
@@ -188,7 +188,8 @@ export default function OptimizationSection({
     setIsGenerating(true);
 
     try {
-      const html2pdf = (await import('html2pdf.js')).default;
+      const html2pdfModule = await import('html2pdf.js');
+      const html2pdf = html2pdfModule.default;
 
       // Create simple HTML content
       const htmlContent = `
@@ -229,9 +230,9 @@ export default function OptimizationSection({
       const opt = {
         margin: 0,
         filename: cv ? `${cv.name.replace(/\s+/g, '_')}_CV_Simple.pdf` : `Optimized_CV_${Date.now()}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
+        image: { type: 'jpeg' as const, quality: 0.98 },
         html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
       };
 
       await html2pdf().set(opt).from(element).save();
