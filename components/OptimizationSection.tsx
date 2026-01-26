@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import jsPDF from 'jspdf';
 
 interface OptimizationSectionProps {
   optimizedCV: {
@@ -19,7 +18,6 @@ export default function OptimizationSection({
   onReset,
 }: OptimizationSectionProps) {
   const [copied, setCopied] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(optimizedCV.optimizedCV || '');
@@ -27,350 +25,470 @@ export default function OptimizationSection({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Parse plain text CV into sections
+  // Parse CV text into structured sections
   const parseCV = (text: string) => {
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    const lines = text.split('\n').map(l => l.trim());
 
     let name = '';
     let title = '';
-    let contactInfo: string[] = [];
+    let contact: string[] = [];
     let summary = '';
-    let experience: Array<{ title: string; company: string; date: string; bullets: string[] }> = [];
+    let experience: Array<{ jobTitle: string; company: string; date: string; location: string; description: string; bullets: string[] }> = [];
     let education: Array<{ degree: string; school: string; details: string }> = [];
     let skills: string[] = [];
 
     let currentSection = '';
-    let currentExp: { title: string; company: string; date: string; bullets: string[] } | null = null;
-    let currentEdu: { degree: string; school: string; details: string } | null = null;
-
-    const sectionHeaders = ['summary', 'professional summary', 'objective', 'profile', 'about', 'experience', 'professional experience', 'work experience', 'work history', 'employment', 'education', 'academic', 'qualifications', 'skills', 'technical skills', 'core competencies', 'expertise', 'technologies'];
+    let currentExp: any = null;
+    let currentEdu: any = null;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const lineLower = line.toLowerCase().replace(/[^a-z\s]/g, '');
+      if (!line) continue;
 
-      // Check if this is a section header
-      const isHeader = sectionHeaders.some(h => {
-        const headerWords = h.split(' ');
-        return headerWords.every(word => lineLower.includes(word)) && line.length < 40;
-      });
+      const lineLower = line.toLowerCase();
 
-      if (isHeader) {
-        // Save current experience/education if any
-        if (currentExp && currentExp.title) {
-          experience.push(currentExp);
-          currentExp = null;
-        }
-        if (currentEdu && currentEdu.degree) {
-          education.push(currentEdu);
-          currentEdu = null;
-        }
-
-        if (lineLower.includes('summary') || lineLower.includes('objective') || lineLower.includes('profile') || lineLower.includes('about')) {
-          currentSection = 'summary';
-        } else if (lineLower.includes('experience') || lineLower.includes('employment') || lineLower.includes('work')) {
-          currentSection = 'experience';
-        } else if (lineLower.includes('education') || lineLower.includes('academic') || lineLower.includes('qualification')) {
-          currentSection = 'education';
-        } else if (lineLower.includes('skill') || lineLower.includes('competenc') || lineLower.includes('expertise') || lineLower.includes('technolog')) {
-          currentSection = 'skills';
-        }
+      // Detect section headers
+      if (/^(professional\s+)?summary$/i.test(line) || /^(career\s+)?objective$/i.test(line) || /^profile$/i.test(line)) {
+        if (currentExp) { experience.push(currentExp); currentExp = null; }
+        if (currentEdu) { education.push(currentEdu); currentEdu = null; }
+        currentSection = 'summary';
+        continue;
+      }
+      if (/^(professional\s+)?experience$/i.test(line) || /^work\s+(history|experience)$/i.test(line) || /^employment$/i.test(line)) {
+        if (currentExp) { experience.push(currentExp); currentExp = null; }
+        if (currentEdu) { education.push(currentEdu); currentEdu = null; }
+        currentSection = 'experience';
+        continue;
+      }
+      if (/^education$/i.test(line) || /^academic/i.test(line)) {
+        if (currentExp) { experience.push(currentExp); currentExp = null; }
+        if (currentEdu) { education.push(currentEdu); currentEdu = null; }
+        currentSection = 'education';
+        continue;
+      }
+      if (/^(technical\s+)?skills$/i.test(line) || /^competencies$/i.test(line) || /^expertise$/i.test(line)) {
+        if (currentExp) { experience.push(currentExp); currentExp = null; }
+        if (currentEdu) { education.push(currentEdu); currentEdu = null; }
+        currentSection = 'skills';
         continue;
       }
 
-      // If no section yet, try to get name and contact
-      if (!currentSection && i < 10) {
-        if (!name && line.length > 2 && line.length < 50 && !line.includes('@') && !line.includes('+') && !/^\d/.test(line)) {
+      // Parse header (before any section)
+      if (!currentSection) {
+        if (!name && line.length > 2 && line.length < 50 && !line.includes('@') && !/^\+?\d/.test(line)) {
           name = line;
           continue;
         }
-        if (name && !title && line.length > 2 && line.length < 60 && !line.includes('@') && !line.includes('+') && !/^\d/.test(line)) {
+        if (name && !title && line.length > 2 && line.length < 80 && !line.includes('@') && !/^\+?\d/.test(line)) {
           title = line;
           continue;
         }
-        if (line.includes('@') || line.includes('+') || lineLower.includes('linkedin') || lineLower.includes('phone') || lineLower.includes('email') || /\d{10,}/.test(line.replace(/\D/g, ''))) {
-          contactInfo.push(line);
+        if (line.includes('@') || /\+?\d{10,}/.test(line.replace(/[\s\-]/g, '')) || lineLower.includes('linkedin')) {
+          contact.push(line);
           continue;
         }
       }
 
-      // Process based on current section
+      // Parse sections
       if (currentSection === 'summary') {
         summary += (summary ? ' ' : '') + line;
       } else if (currentSection === 'experience') {
-        const hasDate = /\d{4}|present|current|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(line);
-        const isBullet = line.startsWith('•') || line.startsWith('-') || line.startsWith('*') || line.startsWith('–') || line.startsWith('◦');
+        const isBullet = /^[•\-\*–◦]/.test(line);
+        const hasDate = /\d{4}|present/i.test(line);
 
         if (isBullet) {
           if (currentExp) {
             currentExp.bullets.push(line.replace(/^[•\-\*–◦]\s*/, ''));
           }
-        } else if (!currentExp) {
-          currentExp = { title: line, company: '', date: '', bullets: [] };
-        } else if (!currentExp.company && !hasDate) {
-          currentExp.company = line;
-        } else if (hasDate) {
-          if (!currentExp.date) {
-            currentExp.date = line;
-          } else {
-            // New job entry
+        } else if (hasDate && line.includes('|')) {
+          // Line with date and pipe - likely "Company | Date"
+          if (currentExp && currentExp.jobTitle) {
             experience.push(currentExp);
-            currentExp = { title: line, company: '', date: '', bullets: [] };
           }
+          currentExp = { jobTitle: '', company: line, date: '', location: '', description: '', bullets: [] };
+        } else if (currentExp && !currentExp.jobTitle) {
+          currentExp.jobTitle = line;
+        } else if (!currentExp) {
+          currentExp = { jobTitle: line, company: '', date: '', location: '', description: '', bullets: [] };
+        } else if (currentExp && !currentExp.company) {
+          currentExp.company = line;
+        } else if (currentExp && line.length > 30 && !isBullet) {
+          // Likely a description line
+          currentExp.description = line;
         }
       } else if (currentSection === 'education') {
         if (!currentEdu) {
           currentEdu = { degree: line, school: '', details: '' };
-        } else if (!currentEdu.school && line.length > 3) {
+        } else if (!currentEdu.school) {
           currentEdu.school = line;
-        } else if (line.length > 2) {
+        } else {
           currentEdu.details += (currentEdu.details ? ' | ' : '') + line;
         }
       } else if (currentSection === 'skills') {
-        // Split by common delimiters
-        const skillItems = line.split(/[,|•·;]/);
-        skillItems.forEach(s => {
-          const skill = s.trim().replace(/^[\-\*]\s*/, '');
-          if (skill && skill.length > 1 && skill.length < 50) {
-            skills.push(skill);
-          }
-        });
+        const skillItems = line.split(/[,|•;]/).map(s => s.trim().replace(/^[\-\*]\s*/, '')).filter(s => s.length > 1 && s.length < 50);
+        skills.push(...skillItems);
       }
     }
 
     // Save last items
-    if (currentExp && currentExp.title) {
-      experience.push(currentExp);
-    }
-    if (currentEdu && currentEdu.degree) {
-      education.push(currentEdu);
-    }
+    if (currentExp && currentExp.jobTitle) experience.push(currentExp);
+    if (currentEdu && currentEdu.degree) education.push(currentEdu);
 
-    return { name, title, contactInfo, summary, experience, education, skills };
+    return { name, title, contact, summary, experience, education, skills };
   };
 
   const handleDownloadPDF = () => {
-    setIsGenerating(true);
+    const cvText = optimizedCV.optimizedCV || '';
+    const cv = parseCV(cvText);
 
-    try {
-      const cvText = optimizedCV.optimizedCV || '';
-      const parsed = parseCV(cvText);
-
-      const doc = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-
-      // Colors
-      const accentColor: [number, number, number] = [14, 165, 233];
-      const darkText: [number, number, number] = [26, 26, 26];
-      const grayText: [number, number, number] = [100, 100, 100];
-      const bodyText: [number, number, number] = [55, 55, 55];
-
-      const margin = 20;
-      const contentWidth = pageWidth - margin * 2;
-      let y = 20;
-
-      // ========== NAME ==========
-      if (parsed.name) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(20);
-        doc.setTextColor(...darkText);
-        doc.text(parsed.name.toUpperCase(), margin, y);
-        y += 7;
+    // Generate professional HTML
+    const htmlContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${cv.name || 'CV'} - Resume</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    @page {
+      size: A4;
+      margin: 0;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #333;
+      background: #f5f5f5;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    
+    .cv-container {
+      max-width: 210mm;
+      min-height: 297mm;
+      margin: 20px auto;
+      background: white;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      display: grid;
+      grid-template-columns: 1fr 220px;
+    }
+    
+    @media print {
+      body {
+        background: white;
       }
-
-      // ========== TITLE ==========
-      if (parsed.title) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.setTextColor(...accentColor);
-        doc.text(parsed.title, margin, y);
-        y += 6;
+      .cv-container {
+        margin: 0;
+        box-shadow: none;
+        max-width: none;
       }
-
-      // ========== CONTACT INFO ==========
-      if (parsed.contactInfo.length > 0) {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(...grayText);
-        const contactLine = parsed.contactInfo.join('  •  ');
-        const contactLines = doc.splitTextToSize(contactLine, contentWidth);
-        doc.text(contactLines, margin, y);
-        y += contactLines.length * 4 + 4;
+      .print-btn {
+        display: none !important;
       }
-
-      // Divider line
-      y += 2;
-      doc.setDrawColor(220, 220, 220);
-      doc.setLineWidth(0.3);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 8;
-
-      // ========== SUMMARY ==========
-      if (parsed.summary) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.setTextColor(...darkText);
-        doc.text('PROFESSIONAL SUMMARY', margin, y);
-        y += 1;
-
-        doc.setDrawColor(...accentColor);
-        doc.setLineWidth(0.6);
-        doc.line(margin, y, margin + 50, y);
-        y += 6;
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(...bodyText);
-        const summaryLines = doc.splitTextToSize(parsed.summary, contentWidth);
-        doc.text(summaryLines, margin, y);
-        y += summaryLines.length * 4 + 8;
+    }
+    
+    /* Left Column - Main Content */
+    .main-content {
+      padding: 35px 30px 35px 35px;
+    }
+    
+    /* Right Column - Sidebar */
+    .sidebar {
+      background: #f8fafc;
+      padding: 35px 25px;
+      border-left: 3px solid #0ea5e9;
+    }
+    
+    /* Header */
+    .name {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1a1a1a;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+    }
+    
+    .title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0ea5e9;
+      margin-bottom: 12px;
+    }
+    
+    .contact-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 9px;
+      color: #666;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    
+    .contact-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    /* Section Headers */
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #1a1a1a;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #0ea5e9;
+    }
+    
+    .sidebar .section-title {
+      font-size: 10px;
+    }
+    
+    /* Summary */
+    .summary {
+      font-size: 10px;
+      color: #444;
+      line-height: 1.6;
+      margin-bottom: 25px;
+    }
+    
+    /* Experience */
+    .experience-section {
+      margin-bottom: 20px;
+    }
+    
+    .job {
+      margin-bottom: 18px;
+    }
+    
+    .job-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+    
+    .job-company {
+      font-size: 10px;
+      font-weight: 600;
+      color: #0ea5e9;
+      margin: 2px 0;
+    }
+    
+    .job-meta {
+      font-size: 9px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+    
+    .job-description {
+      font-size: 9px;
+      color: #555;
+      font-style: italic;
+      margin-bottom: 8px;
+    }
+    
+    .job-bullets {
+      list-style: none;
+      padding: 0;
+    }
+    
+    .job-bullets li {
+      position: relative;
+      padding-left: 14px;
+      font-size: 9px;
+      color: #444;
+      margin-bottom: 5px;
+      line-height: 1.5;
+    }
+    
+    .job-bullets li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: #0ea5e9;
+      font-weight: bold;
+    }
+    
+    /* Sidebar - Education */
+    .education-item {
+      margin-bottom: 15px;
+    }
+    
+    .edu-degree {
+      font-size: 10px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+    
+    .edu-school {
+      font-size: 9px;
+      font-weight: 600;
+      color: #0ea5e9;
+    }
+    
+    .edu-details {
+      font-size: 8px;
+      color: #888;
+    }
+    
+    /* Sidebar - Skills */
+    .skills-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    
+    .skill-tag {
+      background: white;
+      border: 1px solid #ddd;
+      padding: 4px 10px;
+      border-radius: 3px;
+      font-size: 8px;
+      font-weight: 500;
+      color: #333;
+    }
+    
+    /* Print Button */
+    .print-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #0ea5e9, #0284c7);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .print-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(14, 165, 233, 0.5);
+    }
+    
+    .instructions {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1a1a1a;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 12px;
+      text-align: center;
+    }
+    
+    @media print {
+      .instructions {
+        display: none;
       }
+    }
+  </style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()">
+    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+    </svg>
+    Save as PDF
+  </button>
+  
+  <div class="instructions">
+    💡 Click "Save as PDF" → In print dialog, select "Save as PDF" as destination → Click Save
+  </div>
+  
+  <div class="cv-container">
+    <!-- Main Content -->
+    <div class="main-content">
+      ${cv.name ? `<h1 class="name">${cv.name.toUpperCase()}</h1>` : ''}
+      ${cv.title ? `<p class="title">${cv.title}</p>` : ''}
+      
+      ${cv.contact.length > 0 ? `
+        <div class="contact-row">
+          ${cv.contact.map(c => `<span class="contact-item">${c}</span>`).join('')}
+        </div>
+      ` : ''}
+      
+      ${cv.summary ? `
+        <div class="summary-section">
+          <h2 class="section-title">Professional Summary</h2>
+          <p class="summary">${cv.summary}</p>
+        </div>
+      ` : ''}
+      
+      ${cv.experience.length > 0 ? `
+        <div class="experience-section">
+          <h2 class="section-title">Professional Experience</h2>
+          ${cv.experience.map(exp => `
+            <div class="job">
+              <p class="job-title">${exp.jobTitle}</p>
+              ${exp.company ? `<p class="job-company">${exp.company}</p>` : ''}
+              ${exp.description ? `<p class="job-description">${exp.description}</p>` : ''}
+              ${exp.bullets.length > 0 ? `
+                <ul class="job-bullets">
+                  ${exp.bullets.map(b => `<li>${b}</li>`).join('')}
+                </ul>
+              ` : ''}
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="sidebar">
+      ${cv.education.length > 0 ? `
+        <div class="education-section" style="margin-bottom: 25px;">
+          <h2 class="section-title">Education</h2>
+          ${cv.education.map(edu => `
+            <div class="education-item">
+              <p class="edu-degree">${edu.degree}</p>
+              ${edu.school ? `<p class="edu-school">${edu.school}</p>` : ''}
+              ${edu.details ? `<p class="edu-details">${edu.details}</p>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+      
+      ${cv.skills.length > 0 ? `
+        <div class="skills-section">
+          <h2 class="section-title">Skills</h2>
+          <div class="skills-grid">
+            ${cv.skills.map(s => `<span class="skill-tag">${s}</span>`).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  </div>
+</body>
+</html>`;
 
-      // ========== EXPERIENCE ==========
-      if (parsed.experience.length > 0) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.setTextColor(...darkText);
-        doc.text('PROFESSIONAL EXPERIENCE', margin, y);
-        y += 1;
-
-        doc.setDrawColor(...accentColor);
-        doc.setLineWidth(0.6);
-        doc.line(margin, y, margin + 55, y);
-        y += 6;
-
-        for (const exp of parsed.experience) {
-          if (y > pageHeight - 50) {
-            doc.addPage();
-            y = 20;
-          }
-
-          // Job title
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(10);
-          doc.setTextColor(...darkText);
-          doc.text(exp.title, margin, y);
-          y += 5;
-
-          // Company and date
-          if (exp.company || exp.date) {
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(...accentColor);
-            let companyLine = exp.company;
-            if (exp.date) {
-              companyLine += companyLine ? '  |  ' + exp.date : exp.date;
-            }
-            const companyLines = doc.splitTextToSize(companyLine, contentWidth);
-            doc.text(companyLines, margin, y);
-            y += companyLines.length * 4 + 2;
-          }
-
-          // Bullets
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(9);
-          doc.setTextColor(...bodyText);
-
-          for (const bullet of exp.bullets) {
-            if (y > pageHeight - 20) {
-              doc.addPage();
-              y = 20;
-            }
-
-            const bulletText = '•  ' + bullet;
-            const bulletLines = doc.splitTextToSize(bulletText, contentWidth - 5);
-            doc.text(bulletLines, margin + 2, y);
-            y += bulletLines.length * 4 + 1;
-          }
-
-          y += 5;
-        }
-      }
-
-      // ========== EDUCATION ==========
-      if (parsed.education.length > 0) {
-        if (y > pageHeight - 40) {
-          doc.addPage();
-          y = 20;
-        }
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.setTextColor(...darkText);
-        doc.text('EDUCATION', margin, y);
-        y += 1;
-
-        doc.setDrawColor(...accentColor);
-        doc.setLineWidth(0.6);
-        doc.line(margin, y, margin + 30, y);
-        y += 6;
-
-        for (const edu of parsed.education) {
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(10);
-          doc.setTextColor(...darkText);
-          doc.text(edu.degree, margin, y);
-          y += 5;
-
-          if (edu.school) {
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(...accentColor);
-            doc.text(edu.school, margin, y);
-            y += 4;
-          }
-
-          if (edu.details) {
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(8);
-            doc.setTextColor(...grayText);
-            doc.text(edu.details, margin, y);
-            y += 4;
-          }
-
-          y += 3;
-        }
-      }
-
-      // ========== SKILLS ==========
-      if (parsed.skills.length > 0) {
-        if (y > pageHeight - 30) {
-          doc.addPage();
-          y = 20;
-        }
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.setTextColor(...darkText);
-        doc.text('SKILLS', margin, y);
-        y += 1;
-
-        doc.setDrawColor(...accentColor);
-        doc.setLineWidth(0.6);
-        doc.line(margin, y, margin + 20, y);
-        y += 6;
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(...bodyText);
-
-        const skillsText = parsed.skills.join('  •  ');
-        const skillLines = doc.splitTextToSize(skillsText, contentWidth);
-        doc.text(skillLines, margin, y);
-      }
-
-      // Save
-      const fileName = parsed.name
-        ? `${parsed.name.replace(/\s+/g, '_')}_CV.pdf`
-        : `Optimized_CV_${Date.now()}.pdf`;
-      doc.save(fileName);
-
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      alert('Failed to generate PDF. Please try again.');
-    } finally {
-      setIsGenerating(false);
+    // Open in new window
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
     }
   };
 
@@ -429,28 +547,12 @@ export default function OptimizationSection({
       <div className="flex flex-wrap gap-4">
         <button
           onClick={handleDownloadPDF}
-          disabled={isGenerating}
-          className={`flex-1 min-w-[200px] py-4 font-bold rounded-xl transition-all duration-300 flex items-center justify-center ${isGenerating
-            ? 'bg-gray-600 cursor-not-allowed'
-            : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white'
-            }`}
+          className="flex-1 min-w-[200px] py-4 font-bold rounded-xl transition-all duration-300 flex items-center justify-center bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
         >
-          {isGenerating ? (
-            <>
-              <svg className="animate-spin w-5 h-5 mr-2" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              Generating...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Download PDF
-            </>
-          )}
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Download PDF
         </button>
 
         <button
