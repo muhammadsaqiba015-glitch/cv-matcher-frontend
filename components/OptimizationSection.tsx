@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
-import jsPDF from 'jspdf';
+import React, { useState, useRef } from 'react';
 
 interface StructuredCV {
   name: string;
@@ -45,6 +44,8 @@ export default function OptimizationSection({
   onReset,
 }: OptimizationSectionProps) {
   const [copied, setCopied] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const cvRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(optimizedCV.optimizedCV || '');
@@ -52,328 +53,195 @@ export default function OptimizationSection({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Professional Two-Column PDF (Template 1)
-  const handleDownloadProfessionalPDF = () => {
+  // Generate Professional PDF using html2pdf
+  const handleDownloadProfessionalPDF = async () => {
     const cv = optimizedCV.structuredCV;
 
     if (!cv) {
-      // Fallback to simple PDF if no structured data
-      handleDownloadSimplePDF();
+      alert('Structured CV data not available. Please try the Simple Text option.');
       return;
     }
 
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
+    setIsGenerating(true);
 
-    // Layout settings
-    const leftColX = 15;
-    const leftColWidth = 125;
-    const rightColX = 145;
-    const rightColWidth = 50;
-    const accentColor: [number, number, number] = [14, 165, 233]; // #0ea5e9
+    try {
+      // Dynamically import html2pdf
+      const html2pdf = (await import('html2pdf.js')).default;
 
-    let leftY = 20;
-    let rightY = 20;
+      // Create HTML content
+      const htmlContent = `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; width: 210mm; min-height: 297mm; padding: 0; margin: 0; background: white; display: grid; grid-template-columns: 1fr 200px;">
+          
+          <!-- Left Column -->
+          <div style="padding: 30px 25px 30px 30px;">
+            <!-- Header -->
+            <h1 style="font-size: 26px; font-weight: 700; color: #1a1a1a; margin: 0 0 4px 0; letter-spacing: 0.5px;">${cv.name.toUpperCase()}</h1>
+            <p style="font-size: 14px; color: #0ea5e9; font-weight: 600; margin: 0 0 12px 0;">${cv.title}</p>
+            
+            <!-- Contact Row -->
+            <div style="font-size: 10px; color: #555; margin-bottom: 20px; line-height: 1.6;">
+              ${cv.contact.phone ? `<span style="margin-right: 15px;">📞 ${cv.contact.phone}</span>` : ''}
+              ${cv.contact.email ? `<span style="margin-right: 15px;">✉️ ${cv.contact.email}</span>` : ''}
+              <br/>
+              ${cv.contact.linkedin ? `<span style="margin-right: 15px;">🔗 ${cv.contact.linkedin}</span>` : ''}
+              ${cv.contact.location ? `<span>📍 ${cv.contact.location}</span>` : ''}
+            </div>
+            
+            <!-- Summary -->
+            <div style="margin-bottom: 20px;">
+              <h2 style="font-size: 13px; font-weight: 700; color: #1a1a1a; margin: 0 0 8px 0; padding-bottom: 6px; border-bottom: 2px solid #0ea5e9; text-transform: uppercase; letter-spacing: 1px;">Summary</h2>
+              <p style="font-size: 11px; color: #444; line-height: 1.6; margin: 0;">${cv.summary}</p>
+            </div>
+            
+            <!-- Experience -->
+            <div>
+              <h2 style="font-size: 13px; font-weight: 700; color: #1a1a1a; margin: 0 0 12px 0; padding-bottom: 6px; border-bottom: 2px solid #0ea5e9; text-transform: uppercase; letter-spacing: 1px;">Experience</h2>
+              
+              ${cv.experience.map(exp => `
+                <div style="margin-bottom: 16px;">
+                  <p style="font-size: 12px; font-weight: 700; color: #1a1a1a; margin: 0;">${exp.title}</p>
+                  <p style="font-size: 11px; font-weight: 600; color: #0ea5e9; margin: 2px 0;">${exp.company}</p>
+                  <p style="font-size: 9px; color: #777; margin: 4px 0 8px 0;">📅 ${exp.date} &nbsp;&nbsp; 📍 ${exp.location}</p>
+                  <ul style="margin: 0; padding-left: 16px;">
+                    ${exp.bullets.map(bullet => `
+                      <li style="font-size: 10px; color: #444; line-height: 1.5; margin-bottom: 4px;">${bullet}</li>
+                    `).join('')}
+                  </ul>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <!-- Right Column -->
+          <div style="background: #f8fafc; padding: 30px 20px;">
+            <!-- Education -->
+            <div style="margin-bottom: 25px;">
+              <h2 style="font-size: 12px; font-weight: 700; color: #1a1a1a; margin: 0 0 12px 0; padding-bottom: 6px; border-bottom: 2px solid #0ea5e9; text-transform: uppercase; letter-spacing: 1px;">Education</h2>
+              
+              ${cv.education.map(edu => `
+                <div style="margin-bottom: 12px;">
+                  <p style="font-size: 11px; font-weight: 700; color: #1a1a1a; margin: 0;">${edu.degree}</p>
+                  <p style="font-size: 10px; font-weight: 600; color: #0ea5e9; margin: 2px 0;">${edu.school}</p>
+                  <p style="font-size: 9px; color: #777; margin: 2px 0;">
+                    ${edu.date ? `📅 ${edu.date}` : ''}
+                    ${edu.location ? `&nbsp; 📍 ${edu.location}` : ''}
+                  </p>
+                </div>
+              `).join('')}
+            </div>
+            
+            <!-- Skills -->
+            <div>
+              <h2 style="font-size: 12px; font-weight: 700; color: #1a1a1a; margin: 0 0 12px 0; padding-bottom: 6px; border-bottom: 2px solid #0ea5e9; text-transform: uppercase; letter-spacing: 1px;">Skills</h2>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                ${cv.skills.map(skill => `
+                  <span style="background: white; border: 1px solid #ddd; color: #1a1a1a; padding: 4px 10px; border-radius: 3px; font-size: 9px; font-weight: 500;">${skill}</span>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
 
-    // ============ LEFT COLUMN ============
+      // Create temporary element
+      const element = document.createElement('div');
+      element.innerHTML = htmlContent;
+      element.style.position = 'absolute';
+      element.style.left = '-9999px';
+      document.body.appendChild(element);
 
-    // Name
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(26, 26, 26);
-    doc.text(cv.name.toUpperCase(), leftColX, leftY);
-    leftY += 7;
-
-    // Title
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
-    doc.text(cv.title, leftColX, leftY);
-    leftY += 8;
-
-    // Contact Row
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(80, 80, 80);
-
-    const contactParts = [];
-    if (cv.contact.phone) contactParts.push(`📞 ${cv.contact.phone}`);
-    if (cv.contact.email) contactParts.push(`✉ ${cv.contact.email}`);
-    if (cv.contact.linkedin) contactParts.push(`🔗 ${cv.contact.linkedin}`);
-    if (cv.contact.location) contactParts.push(`📍 ${cv.contact.location}`);
-
-    const contactLine = contactParts.join('  |  ');
-    const contactLines = doc.splitTextToSize(contactLine, leftColWidth);
-    doc.text(contactLines, leftColX, leftY);
-    leftY += contactLines.length * 4 + 8;
-
-    // SUMMARY Section
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(26, 26, 26);
-    doc.text('SUMMARY', leftColX, leftY);
-    leftY += 2;
-
-    // Underline
-    doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
-    doc.setLineWidth(0.5);
-    doc.line(leftColX, leftY, leftColX + leftColWidth, leftY);
-    leftY += 6;
-
-    // Summary text
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(68, 68, 68);
-    const summaryLines = doc.splitTextToSize(cv.summary, leftColWidth);
-    doc.text(summaryLines, leftColX, leftY);
-    leftY += summaryLines.length * 4 + 8;
-
-    // EXPERIENCE Section
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(26, 26, 26);
-    doc.text('EXPERIENCE', leftColX, leftY);
-    leftY += 2;
-
-    // Underline
-    doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
-    doc.line(leftColX, leftY, leftColX + leftColWidth, leftY);
-    leftY += 6;
-
-    // Experience items
-    cv.experience.forEach((exp) => {
-      // Check if we need a new page
-      if (leftY > pageHeight - 40) {
-        doc.addPage();
-        leftY = 20;
-      }
-
-      // Job title
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(26, 26, 26);
-      doc.text(exp.title, leftColX, leftY);
-      leftY += 4;
-
-      // Company
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
-      doc.text(exp.company, leftColX, leftY);
-      leftY += 4;
-
-      // Date & Location
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 100, 100);
-      doc.text(`📅 ${exp.date}    📍 ${exp.location}`, leftColX, leftY);
-      leftY += 5;
-
-      // Bullets
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(68, 68, 68);
-
-      exp.bullets.forEach((bullet) => {
-        if (leftY > pageHeight - 20) {
-          doc.addPage();
-          leftY = 20;
+      // PDF options
+      const opt = {
+        margin: 0,
+        filename: `${cv.name.replace(/\s+/g, '_')}_CV_Professional.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          letterRendering: true
+        },
+        jsPDF: {
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait'
         }
+      };
 
-        const bulletLines = doc.splitTextToSize(`• ${bullet}`, leftColWidth - 5);
-        doc.text(bulletLines, leftColX + 3, leftY);
-        leftY += bulletLines.length * 3.5 + 1;
-      });
+      // Generate PDF
+      await html2pdf().set(opt).from(element).save();
 
-      leftY += 4;
-    });
-
-    // ============ RIGHT COLUMN ============
-
-    // EDUCATION Section
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(26, 26, 26);
-    doc.text('EDUCATION', rightColX, rightY);
-    rightY += 2;
-
-    // Underline
-    doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
-    doc.line(rightColX, rightY, rightColX + rightColWidth, rightY);
-    rightY += 6;
-
-    // Education items
-    cv.education.forEach((edu) => {
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(26, 26, 26);
-      const degreeLines = doc.splitTextToSize(edu.degree, rightColWidth);
-      doc.text(degreeLines, rightColX, rightY);
-      rightY += degreeLines.length * 3.5;
-
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
-      const schoolLines = doc.splitTextToSize(edu.school, rightColWidth);
-      doc.text(schoolLines, rightColX, rightY);
-      rightY += schoolLines.length * 3.5;
-
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 100, 100);
-      if (edu.date) doc.text(`📅 ${edu.date}`, rightColX, rightY);
-      rightY += 3;
-      if (edu.location) doc.text(`📍 ${edu.location}`, rightColX, rightY);
-      rightY += 6;
-    });
-
-    rightY += 4;
-
-    // SKILLS Section
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(26, 26, 26);
-    doc.text('SKILLS', rightColX, rightY);
-    rightY += 2;
-
-    // Underline
-    doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
-    doc.line(rightColX, rightY, rightColX + rightColWidth, rightY);
-    rightY += 6;
-
-    // Skills as wrapped text
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(26, 26, 26);
-
-    let skillX = rightColX;
-    let skillY = rightY;
-    const skillGapX = 2;
-    const skillGapY = 5;
-
-    cv.skills.forEach((skill) => {
-      const skillWidth = doc.getTextWidth(skill) + 6;
-
-      // Check if skill fits on current line
-      if (skillX + skillWidth > rightColX + rightColWidth) {
-        skillX = rightColX;
-        skillY += skillGapY;
-      }
-
-      // Check if we need new page
-      if (skillY > pageHeight - 20) {
-        doc.addPage();
-        skillY = 20;
-        skillX = rightColX;
-      }
-
-      // Draw skill tag
-      doc.setDrawColor(200, 200, 200);
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(skillX, skillY - 3, skillWidth, 5, 1, 1, 'FD');
-      doc.setTextColor(26, 26, 26);
-      doc.text(skill, skillX + 3, skillY);
-
-      skillX += skillWidth + skillGapX;
-    });
-
-    // Save
-    doc.save(`${cv.name.replace(/\s+/g, '_')}_CV_Professional.pdf`);
+      // Cleanup
+      document.body.removeChild(element);
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   // Simple Text PDF
-  const handleDownloadSimplePDF = () => {
-    const cvText = optimizedCV.optimizedCV || '';
+  const handleDownloadSimplePDF = async () => {
     const cv = optimizedCV.structuredCV;
+    const cvText = optimizedCV.optimizedCV || '';
 
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 20;
-    const maxWidth = pageWidth - (margin * 2);
-    let yPos = 20;
+    setIsGenerating(true);
 
-    // If we have structured data, use name for title
-    if (cv) {
-      // Name
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(26, 26, 26);
-      doc.text(cv.name.toUpperCase(), pageWidth / 2, yPos, { align: 'center' });
-      yPos += 6;
+    try {
+      const html2pdf = (await import('html2pdf.js')).default;
 
-      // Title
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(14, 165, 233);
-      doc.text(cv.title, pageWidth / 2, yPos, { align: 'center' });
-      yPos += 6;
+      // Create simple HTML content
+      const htmlContent = `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; width: 210mm; min-height: 297mm; padding: 30px 40px; background: white;">
+          ${cv ? `
+            <!-- Header -->
+            <div style="text-align: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #0ea5e9;">
+              <h1 style="font-size: 24px; font-weight: 700; color: #1a1a1a; margin: 0 0 4px 0;">${cv.name.toUpperCase()}</h1>
+              <p style="font-size: 14px; color: #0ea5e9; font-weight: 600; margin: 0 0 10px 0;">${cv.title}</p>
+              <p style="font-size: 10px; color: #666; margin: 0;">
+                ${cv.contact.phone ? `${cv.contact.phone}` : ''} 
+                ${cv.contact.phone && cv.contact.email ? ' | ' : ''}
+                ${cv.contact.email ? `${cv.contact.email}` : ''}
+                ${(cv.contact.phone || cv.contact.email) && cv.contact.linkedin ? ' | ' : ''}
+                ${cv.contact.linkedin ? `${cv.contact.linkedin}` : ''}
+                ${(cv.contact.phone || cv.contact.email || cv.contact.linkedin) && cv.contact.location ? ' | ' : ''}
+                ${cv.contact.location ? `${cv.contact.location}` : ''}
+              </p>
+            </div>
+          ` : ''}
+          
+          <!-- CV Content -->
+          <div style="font-size: 11px; color: #333; line-height: 1.7; white-space: pre-wrap;">${cvText.replace(/\n/g, '<br/>')}</div>
+          
+          <!-- Footer -->
+          <div style="position: fixed; bottom: 20px; left: 0; right: 0; text-align: center;">
+            <p style="font-size: 8px; color: #999;">Generated by Rate Your CV</p>
+          </div>
+        </div>
+      `;
 
-      // Contact line
-      doc.setFontSize(9);
-      doc.setTextColor(80, 80, 80);
-      const contactParts = [];
-      if (cv.contact.phone) contactParts.push(cv.contact.phone);
-      if (cv.contact.email) contactParts.push(cv.contact.email);
-      if (cv.contact.linkedin) contactParts.push(cv.contact.linkedin);
-      if (cv.contact.location) contactParts.push(cv.contact.location);
-      doc.text(contactParts.join(' | '), pageWidth / 2, yPos, { align: 'center' });
-      yPos += 10;
+      const element = document.createElement('div');
+      element.innerHTML = htmlContent;
+      element.style.position = 'absolute';
+      element.style.left = '-9999px';
+      document.body.appendChild(element);
 
-      // Divider
-      doc.setDrawColor(200, 200, 200);
-      doc.line(margin, yPos, pageWidth - margin, yPos);
-      yPos += 8;
-    } else {
-      // Title if no structured data
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(14, 165, 233);
-      doc.text('Optimized CV', pageWidth / 2, yPos, { align: 'center' });
-      yPos += 10;
+      const opt = {
+        margin: 0,
+        filename: cv ? `${cv.name.replace(/\s+/g, '_')}_CV_Simple.pdf` : `Optimized_CV_${Date.now()}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      await html2pdf().set(opt).from(element).save();
+      document.body.removeChild(element);
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGenerating(false);
     }
-
-    // CV Content
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(50, 50, 50);
-
-    const lines = doc.splitTextToSize(cvText, maxWidth);
-
-    lines.forEach((line: string) => {
-      if (yPos > pageHeight - 20) {
-        doc.addPage();
-        yPos = 20;
-      }
-
-      // Check if line is a section header (all caps)
-      if (line === line.toUpperCase() && line.length > 3 && line.length < 30 && /^[A-Z\s]+$/.test(line.trim())) {
-        yPos += 4;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.setTextColor(26, 26, 26);
-        doc.text(line, margin, yPos);
-        yPos += 2;
-        doc.setDrawColor(14, 165, 233);
-        doc.setLineWidth(0.3);
-        doc.line(margin, yPos, margin + doc.getTextWidth(line), yPos);
-        yPos += 5;
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.setTextColor(50, 50, 50);
-      } else {
-        doc.text(line, margin, yPos);
-        yPos += 5;
-      }
-    });
-
-    // Footer
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text('Generated by Rate Your CV', pageWidth / 2, pageHeight - 10, { align: 'center' });
-
-    const fileName = cv ? `${cv.name.replace(/\s+/g, '_')}_CV_Simple.pdf` : `Optimized_CV_${Date.now()}.pdf`;
-    doc.save(fileName);
   };
 
   return (
@@ -434,11 +302,22 @@ export default function OptimizationSection({
           {/* Professional Template */}
           <button
             onClick={handleDownloadProfessionalPDF}
-            className="p-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-cyan-700 transition-all duration-300 flex flex-col items-center justify-center"
+            disabled={isGenerating || !optimizedCV.structuredCV}
+            className={`p-5 text-white font-bold rounded-xl transition-all duration-300 flex flex-col items-center justify-center ${isGenerating || !optimizedCV.structuredCV
+              ? 'bg-gray-600 cursor-not-allowed opacity-50'
+              : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700'
+              }`}
           >
-            <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+            {isGenerating ? (
+              <svg className="animate-spin w-8 h-8 mb-2" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            ) : (
+              <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            )}
             <span className="text-base">Professional Template</span>
             <span className="text-xs opacity-75 mt-1">Two-column modern design</span>
           </button>
@@ -446,11 +325,22 @@ export default function OptimizationSection({
           {/* Simple Text */}
           <button
             onClick={handleDownloadSimplePDF}
-            className="p-4 bg-gradient-to-r from-gray-600 to-gray-700 text-white font-bold rounded-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-300 flex flex-col items-center justify-center"
+            disabled={isGenerating}
+            className={`p-5 text-white font-bold rounded-xl transition-all duration-300 flex flex-col items-center justify-center ${isGenerating
+              ? 'bg-gray-600 cursor-not-allowed opacity-50'
+              : 'bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800'
+              }`}
           >
-            <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-            </svg>
+            {isGenerating ? (
+              <svg className="animate-spin w-8 h-8 mb-2" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            ) : (
+              <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+              </svg>
+            )}
             <span className="text-base">Simple Text</span>
             <span className="text-xs opacity-75 mt-1">Clean single-column format</span>
           </button>
