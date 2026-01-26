@@ -3,35 +3,9 @@
 import React, { useState } from 'react';
 import jsPDF from 'jspdf';
 
-interface StructuredCV {
-  name: string;
-  title: string;
-  contact: {
-    phone: string;
-    email: string;
-    linkedin: string;
-    location: string;
-  };
-  summary: string;
-  experience: Array<{
-    title: string;
-    company: string;
-    date: string;
-    location: string;
-    bullets: string[];
-  }>;
-  education: Array<{
-    degree: string;
-    school: string;
-    date: string;
-    location: string;
-  }>;
-  skills: string[];
-}
-
 interface OptimizationSectionProps {
   optimizedCV: {
-    structuredCV?: StructuredCV;
+    structuredCV?: any;
     optimizedCV: string;
     changes: string[];
     expectedScore: number;
@@ -53,221 +27,343 @@ export default function OptimizationSection({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownloadPDF = () => {
-    const cv = optimizedCV.structuredCV;
+  // Parse plain text CV into sections
+  const parseCV = (text: string) => {
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
 
-    if (!cv) {
-      // Fallback: just use plain text
-      downloadSimplePDF();
-      return;
+    let name = '';
+    let title = '';
+    let contactInfo: string[] = [];
+    let summary = '';
+    let experience: Array<{ title: string; company: string; date: string; bullets: string[] }> = [];
+    let education: Array<{ degree: string; school: string; details: string }> = [];
+    let skills: string[] = [];
+
+    let currentSection = '';
+    let currentExp: { title: string; company: string; date: string; bullets: string[] } | null = null;
+    let currentEdu: { degree: string; school: string; details: string } | null = null;
+
+    const sectionHeaders = ['summary', 'professional summary', 'objective', 'profile', 'about', 'experience', 'professional experience', 'work experience', 'work history', 'employment', 'education', 'academic', 'qualifications', 'skills', 'technical skills', 'core competencies', 'expertise', 'technologies'];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineLower = line.toLowerCase().replace(/[^a-z\s]/g, '');
+
+      // Check if this is a section header
+      const isHeader = sectionHeaders.some(h => {
+        const headerWords = h.split(' ');
+        return headerWords.every(word => lineLower.includes(word)) && line.length < 40;
+      });
+
+      if (isHeader) {
+        // Save current experience/education if any
+        if (currentExp && currentExp.title) {
+          experience.push(currentExp);
+          currentExp = null;
+        }
+        if (currentEdu && currentEdu.degree) {
+          education.push(currentEdu);
+          currentEdu = null;
+        }
+
+        if (lineLower.includes('summary') || lineLower.includes('objective') || lineLower.includes('profile') || lineLower.includes('about')) {
+          currentSection = 'summary';
+        } else if (lineLower.includes('experience') || lineLower.includes('employment') || lineLower.includes('work')) {
+          currentSection = 'experience';
+        } else if (lineLower.includes('education') || lineLower.includes('academic') || lineLower.includes('qualification')) {
+          currentSection = 'education';
+        } else if (lineLower.includes('skill') || lineLower.includes('competenc') || lineLower.includes('expertise') || lineLower.includes('technolog')) {
+          currentSection = 'skills';
+        }
+        continue;
+      }
+
+      // If no section yet, try to get name and contact
+      if (!currentSection && i < 10) {
+        if (!name && line.length > 2 && line.length < 50 && !line.includes('@') && !line.includes('+') && !/^\d/.test(line)) {
+          name = line;
+          continue;
+        }
+        if (name && !title && line.length > 2 && line.length < 60 && !line.includes('@') && !line.includes('+') && !/^\d/.test(line)) {
+          title = line;
+          continue;
+        }
+        if (line.includes('@') || line.includes('+') || lineLower.includes('linkedin') || lineLower.includes('phone') || lineLower.includes('email') || /\d{10,}/.test(line.replace(/\D/g, ''))) {
+          contactInfo.push(line);
+          continue;
+        }
+      }
+
+      // Process based on current section
+      if (currentSection === 'summary') {
+        summary += (summary ? ' ' : '') + line;
+      } else if (currentSection === 'experience') {
+        const hasDate = /\d{4}|present|current|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(line);
+        const isBullet = line.startsWith('•') || line.startsWith('-') || line.startsWith('*') || line.startsWith('–') || line.startsWith('◦');
+
+        if (isBullet) {
+          if (currentExp) {
+            currentExp.bullets.push(line.replace(/^[•\-\*–◦]\s*/, ''));
+          }
+        } else if (!currentExp) {
+          currentExp = { title: line, company: '', date: '', bullets: [] };
+        } else if (!currentExp.company && !hasDate) {
+          currentExp.company = line;
+        } else if (hasDate) {
+          if (!currentExp.date) {
+            currentExp.date = line;
+          } else {
+            // New job entry
+            experience.push(currentExp);
+            currentExp = { title: line, company: '', date: '', bullets: [] };
+          }
+        }
+      } else if (currentSection === 'education') {
+        if (!currentEdu) {
+          currentEdu = { degree: line, school: '', details: '' };
+        } else if (!currentEdu.school && line.length > 3) {
+          currentEdu.school = line;
+        } else if (line.length > 2) {
+          currentEdu.details += (currentEdu.details ? ' | ' : '') + line;
+        }
+      } else if (currentSection === 'skills') {
+        // Split by common delimiters
+        const skillItems = line.split(/[,|•·;]/);
+        skillItems.forEach(s => {
+          const skill = s.trim().replace(/^[\-\*]\s*/, '');
+          if (skill && skill.length > 1 && skill.length < 50) {
+            skills.push(skill);
+          }
+        });
+      }
     }
 
+    // Save last items
+    if (currentExp && currentExp.title) {
+      experience.push(currentExp);
+    }
+    if (currentEdu && currentEdu.degree) {
+      education.push(currentEdu);
+    }
+
+    return { name, title, contactInfo, summary, experience, education, skills };
+  };
+
+  const handleDownloadPDF = () => {
     setIsGenerating(true);
 
     try {
+      const cvText = optimizedCV.optimizedCV || '';
+      const parsed = parseCV(cvText);
+
       const doc = new jsPDF('p', 'mm', 'a4');
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
 
       // Colors
-      const accentColor: [number, number, number] = [14, 165, 233]; // #0ea5e9
+      const accentColor: [number, number, number] = [14, 165, 233];
       const darkText: [number, number, number] = [26, 26, 26];
       const grayText: [number, number, number] = [100, 100, 100];
-      const bodyText: [number, number, number] = [68, 68, 68];
+      const bodyText: [number, number, number] = [55, 55, 55];
 
-      // Layout
-      const leftMargin = 15;
-      const rightColStart = 140;
-      const rightColWidth = 55;
-      const leftColWidth = 120;
-
-      let y = 15;
+      const margin = 20;
+      const contentWidth = pageWidth - margin * 2;
+      let y = 20;
 
       // ========== NAME ==========
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(22);
-      doc.setTextColor(...darkText);
-      doc.text(cv.name.toUpperCase(), leftMargin, y);
-      y += 7;
+      if (parsed.name) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(20);
+        doc.setTextColor(...darkText);
+        doc.text(parsed.name.toUpperCase(), margin, y);
+        y += 7;
+      }
 
       // ========== TITLE ==========
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(...accentColor);
-      doc.text(cv.title, leftMargin, y);
-      y += 6;
+      if (parsed.title) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(...accentColor);
+        doc.text(parsed.title, margin, y);
+        y += 6;
+      }
 
       // ========== CONTACT INFO ==========
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(...grayText);
-
-      const contactItems = [];
-      if (cv.contact.phone) contactItems.push(cv.contact.phone);
-      if (cv.contact.email) contactItems.push(cv.contact.email);
-      if (cv.contact.linkedin) contactItems.push(cv.contact.linkedin);
-      if (cv.contact.location) contactItems.push(cv.contact.location);
-
-      const contactLine = contactItems.join('  |  ');
-      const contactLines = doc.splitTextToSize(contactLine, leftColWidth + 30);
-      doc.text(contactLines, leftMargin, y);
-      y += contactLines.length * 4 + 6;
-
-      // ========== SUMMARY SECTION ==========
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(...darkText);
-      doc.text('SUMMARY', leftMargin, y);
-      y += 1;
-
-      // Underline
-      doc.setDrawColor(...accentColor);
-      doc.setLineWidth(0.5);
-      doc.line(leftMargin, y, leftMargin + 30, y);
-      y += 5;
-
-      // Summary text
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(...bodyText);
-      const summaryLines = doc.splitTextToSize(cv.summary, leftColWidth);
-      doc.text(summaryLines, leftMargin, y);
-      y += summaryLines.length * 4 + 6;
-
-      // ========== EXPERIENCE SECTION ==========
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(...darkText);
-      doc.text('EXPERIENCE', leftMargin, y);
-      y += 1;
-
-      doc.setDrawColor(...accentColor);
-      doc.line(leftMargin, y, leftMargin + 40, y);
-      y += 5;
-
-      // Experience items
-      for (const exp of cv.experience) {
-        // Check page break
-        if (y > pageHeight - 40) {
-          doc.addPage();
-          y = 15;
-        }
-
-        // Job title
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(...darkText);
-        doc.text(exp.title, leftMargin, y);
-        y += 4;
-
-        // Company
-        doc.setFont('helvetica', 'bold');
+      if (parsed.contactInfo.length > 0) {
+        doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
-        doc.setTextColor(...accentColor);
-        doc.text(exp.company, leftMargin, y);
-        y += 4;
-
-        // Date & Location
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
         doc.setTextColor(...grayText);
-        doc.text(`${exp.date}  |  ${exp.location}`, leftMargin, y);
-        y += 5;
+        const contactLine = parsed.contactInfo.join('  •  ');
+        const contactLines = doc.splitTextToSize(contactLine, contentWidth);
+        doc.text(contactLines, margin, y);
+        y += contactLines.length * 4 + 4;
+      }
 
-        // Bullets
+      // Divider line
+      y += 2;
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.3);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 8;
+
+      // ========== SUMMARY ==========
+      if (parsed.summary) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(...darkText);
+        doc.text('PROFESSIONAL SUMMARY', margin, y);
+        y += 1;
+
+        doc.setDrawColor(...accentColor);
+        doc.setLineWidth(0.6);
+        doc.line(margin, y, margin + 50, y);
+        y += 6;
+
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
+        doc.setFontSize(9);
         doc.setTextColor(...bodyText);
+        const summaryLines = doc.splitTextToSize(parsed.summary, contentWidth);
+        doc.text(summaryLines, margin, y);
+        y += summaryLines.length * 4 + 8;
+      }
 
-        for (const bullet of exp.bullets) {
-          if (y > pageHeight - 20) {
+      // ========== EXPERIENCE ==========
+      if (parsed.experience.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(...darkText);
+        doc.text('PROFESSIONAL EXPERIENCE', margin, y);
+        y += 1;
+
+        doc.setDrawColor(...accentColor);
+        doc.setLineWidth(0.6);
+        doc.line(margin, y, margin + 55, y);
+        y += 6;
+
+        for (const exp of parsed.experience) {
+          if (y > pageHeight - 50) {
             doc.addPage();
-            y = 15;
+            y = 20;
           }
 
-          const bulletLines = doc.splitTextToSize(`•  ${bullet}`, leftColWidth - 5);
-          doc.text(bulletLines, leftMargin + 2, y);
-          y += bulletLines.length * 3.5 + 1;
+          // Job title
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(...darkText);
+          doc.text(exp.title, margin, y);
+          y += 5;
+
+          // Company and date
+          if (exp.company || exp.date) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(...accentColor);
+            let companyLine = exp.company;
+            if (exp.date) {
+              companyLine += companyLine ? '  |  ' + exp.date : exp.date;
+            }
+            const companyLines = doc.splitTextToSize(companyLine, contentWidth);
+            doc.text(companyLines, margin, y);
+            y += companyLines.length * 4 + 2;
+          }
+
+          // Bullets
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(...bodyText);
+
+          for (const bullet of exp.bullets) {
+            if (y > pageHeight - 20) {
+              doc.addPage();
+              y = 20;
+            }
+
+            const bulletText = '•  ' + bullet;
+            const bulletLines = doc.splitTextToSize(bulletText, contentWidth - 5);
+            doc.text(bulletLines, margin + 2, y);
+            y += bulletLines.length * 4 + 1;
+          }
+
+          y += 5;
         }
-
-        y += 4;
       }
-
-      // ========== RIGHT COLUMN ==========
-      let rightY = 15;
-
-      // Light gray background for right column
-      doc.setFillColor(248, 250, 252);
-      doc.rect(rightColStart - 5, 0, rightColWidth + 15, pageHeight, 'F');
 
       // ========== EDUCATION ==========
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(...darkText);
-      doc.text('EDUCATION', rightColStart, rightY);
-      rightY += 1;
+      if (parsed.education.length > 0) {
+        if (y > pageHeight - 40) {
+          doc.addPage();
+          y = 20;
+        }
 
-      doc.setDrawColor(...accentColor);
-      doc.line(rightColStart, rightY, rightColStart + 35, rightY);
-      rightY += 5;
-
-      for (const edu of cv.education) {
-        // Degree
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
+        doc.setFontSize(11);
         doc.setTextColor(...darkText);
-        const degreeLines = doc.splitTextToSize(edu.degree, rightColWidth);
-        doc.text(degreeLines, rightColStart, rightY);
-        rightY += degreeLines.length * 3.5;
+        doc.text('EDUCATION', margin, y);
+        y += 1;
 
-        // School
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(...accentColor);
-        const schoolLines = doc.splitTextToSize(edu.school, rightColWidth);
-        doc.text(schoolLines, rightColStart, rightY);
-        rightY += schoolLines.length * 3.5;
+        doc.setDrawColor(...accentColor);
+        doc.setLineWidth(0.6);
+        doc.line(margin, y, margin + 30, y);
+        y += 6;
 
-        // Date & Location
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
-        doc.setTextColor(...grayText);
-        if (edu.location) {
-          doc.text(edu.location, rightColStart, rightY);
-          rightY += 3;
+        for (const edu of parsed.education) {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(...darkText);
+          doc.text(edu.degree, margin, y);
+          y += 5;
+
+          if (edu.school) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(...accentColor);
+            doc.text(edu.school, margin, y);
+            y += 4;
+          }
+
+          if (edu.details) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(...grayText);
+            doc.text(edu.details, margin, y);
+            y += 4;
+          }
+
+          y += 3;
         }
-        if (edu.date) {
-          doc.text(edu.date, rightColStart, rightY);
-          rightY += 3;
-        }
-
-        rightY += 4;
       }
 
-      rightY += 4;
-
       // ========== SKILLS ==========
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(...darkText);
-      doc.text('SKILLS', rightColStart, rightY);
-      rightY += 1;
+      if (parsed.skills.length > 0) {
+        if (y > pageHeight - 30) {
+          doc.addPage();
+          y = 20;
+        }
 
-      doc.setDrawColor(...accentColor);
-      doc.line(rightColStart, rightY, rightColStart + 25, rightY);
-      rightY += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(...darkText);
+        doc.text('SKILLS', margin, y);
+        y += 1;
 
-      // Skills as wrapped text
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(...darkText);
+        doc.setDrawColor(...accentColor);
+        doc.setLineWidth(0.6);
+        doc.line(margin, y, margin + 20, y);
+        y += 6;
 
-      const skillsText = cv.skills.join('  •  ');
-      const skillLines = doc.splitTextToSize(skillsText, rightColWidth);
-      doc.text(skillLines, rightColStart, rightY);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(...bodyText);
 
-      // Save PDF
-      const fileName = `${cv.name.replace(/\s+/g, '_')}_CV.pdf`;
+        const skillsText = parsed.skills.join('  •  ');
+        const skillLines = doc.splitTextToSize(skillsText, contentWidth);
+        doc.text(skillLines, margin, y);
+      }
+
+      // Save
+      const fileName = parsed.name
+        ? `${parsed.name.replace(/\s+/g, '_')}_CV.pdf`
+        : `Optimized_CV_${Date.now()}.pdf`;
       doc.save(fileName);
 
     } catch (error) {
@@ -276,41 +372,6 @@ export default function OptimizationSection({
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  const downloadSimplePDF = () => {
-    const cvText = optimizedCV.optimizedCV || '';
-
-    const doc = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 20;
-    const maxWidth = pageWidth - margin * 2;
-
-    let y = 20;
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(14, 165, 233);
-    doc.text('Optimized CV', pageWidth / 2, y, { align: 'center' });
-    y += 10;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(50, 50, 50);
-
-    const lines = doc.splitTextToSize(cvText, maxWidth);
-
-    for (const line of lines) {
-      if (y > pageHeight - 20) {
-        doc.addPage();
-        y = 20;
-      }
-      doc.text(line, margin, y);
-      y += 5;
-    }
-
-    doc.save(`Optimized_CV_${Date.now()}.pdf`);
   };
 
   return (
