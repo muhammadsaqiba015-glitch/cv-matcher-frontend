@@ -18,7 +18,6 @@ class ClaudeAnalyzer {
     const cvLower = cvText.toLowerCase();
     const jdLower = jdText.toLowerCase();
 
-    // Check for very short content
     if (cvText.length < 100) {
       return {
         isFake: true,
@@ -35,7 +34,6 @@ class ClaudeAnalyzer {
       };
     }
 
-    // Check for gibberish/random characters
     const gibberishPattern = /^[a-z]{20,}$|asdf|qwerty|lorem ipsum|test123|abc123|zzzzz|xxxxx|aaaaaa|jjjjj/i;
     if (gibberishPattern.test(cvText) || gibberishPattern.test(jdText)) {
       return {
@@ -45,7 +43,6 @@ class ClaudeAnalyzer {
       };
     }
 
-    // Check for repeated characters or nonsense
     const repeatedPattern = /(.)\1{10,}/;
     if (repeatedPattern.test(cvText) || repeatedPattern.test(jdText)) {
       return {
@@ -55,7 +52,6 @@ class ClaudeAnalyzer {
       };
     }
 
-    // Check if CV has no real structure (no common CV words)
     const cvKeywords = ['experience', 'education', 'skills', 'work', 'job', 'company', 'university', 'college', 'degree', 'project', 'team', 'manage', 'develop', 'create', 'lead', 'responsible', 'year', 'month', 'resume', 'cv', 'professional', 'summary', 'objective', 'contact', 'email', 'phone'];
     const cvKeywordCount = cvKeywords.filter(word => cvLower.includes(word)).length;
 
@@ -67,7 +63,6 @@ class ClaudeAnalyzer {
       };
     }
 
-    // Check if JD has no job-related words
     const jdKeywords = ['position', 'role', 'responsibility', 'requirement', 'qualification', 'experience', 'skill', 'team', 'company', 'work', 'candidate', 'apply', 'job', 'salary', 'benefit', 'looking', 'hire', 'opportunity', 'description', 'duties'];
     const jdKeywordCount = jdKeywords.filter(word => jdLower.includes(word)).length;
 
@@ -79,7 +74,6 @@ class ClaudeAnalyzer {
       };
     }
 
-    // Check for obviously unrelated content (like song lyrics, stories, etc.)
     const storyPatterns = /once upon a time|the end|chapter \d|verse \d|chorus|lyrics/i;
     if (storyPatterns.test(cvText) || storyPatterns.test(jdText)) {
       return {
@@ -93,7 +87,6 @@ class ClaudeAnalyzer {
   }
 
   async analyze(jdText, cvText) {
-    // First, check for fake documents
     const fakeCheck = this.detectFakeDocument(cvText, jdText);
     if (fakeCheck.isFake) {
       return {
@@ -229,20 +222,63 @@ HONEST OPTIMIZATION:
 - Target score: 65-80%
 `}
 
+IMPORTANT: You must return BOTH a structured version AND a plain text version of the CV.
+
 Return JSON ONLY (no other text):
 {
-  "optimizedCV": "<complete optimized CV text with proper formatting - include name, contact, summary, skills, experience, education>",
+  "structuredCV": {
+    "name": "<full name from CV - EXTRACT EXACTLY AS WRITTEN>",
+    "title": "<job title/professional title>",
+    "contact": {
+      "phone": "<phone number exactly as in original CV>",
+      "email": "<email address exactly as in original CV>",
+      "linkedin": "<linkedin URL or username exactly as in original CV>",
+      "location": "<city, country or location>"
+    },
+    "summary": "<optimized professional summary paragraph>",
+    "experience": [
+      {
+        "title": "<job title>",
+        "company": "<company name>",
+        "date": "<date range like 04/2023 - Present>",
+        "location": "<location>",
+        "bullets": [
+          "<achievement/responsibility 1>",
+          "<achievement/responsibility 2>",
+          "<achievement/responsibility 3>"
+        ]
+      }
+    ],
+    "education": [
+      {
+        "degree": "<degree name>",
+        "school": "<school/university name>",
+        "date": "<graduation date or date range>",
+        "location": "<location>"
+      }
+    ],
+    "skills": ["<skill 1>", "<skill 2>", "<skill 3>"]
+  },
+  "optimizedCV": "<complete optimized CV as plain text with proper formatting>",
   "changes": ["<specific change 1>", "<specific change 2>", "<specific change 3>", "<specific change 4>", "<specific change 5>"],
   "expectedScore": <number>,
   "keywordsAdded": ["<keyword 1>", "<keyword 2>", "<keyword 3>"]
-}`;
+}
+
+CRITICAL RULES:
+1. Extract ALL personal info (name, phone, email, linkedin, location) from the original CV EXACTLY as written - do not modify contact information
+2. Include ALL experience entries from the original CV
+3. Include ALL education entries from the original CV  
+4. Include ALL skills (original + new keywords added for optimization)
+5. The structuredCV must be COMPLETE and ACCURATE
+6. Phone numbers, emails, and LinkedIn must be copied exactly from the original`;
 
     try {
       console.log('Starting optimization, level:', level);
 
       const response = await this.client.messages.create({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 3500,
+        max_tokens: 4000,
         messages: [{ role: 'user', content: prompt }]
       });
 
@@ -262,12 +298,18 @@ Return JSON ONLY (no other text):
         result.expectedScore = 95;
       }
 
+      // Ensure structuredCV exists
+      if (!result.structuredCV) {
+        result.structuredCV = null;
+      }
+
       return result;
 
     } catch (error) {
       console.error('Optimization error:', error.message);
 
       return {
+        structuredCV: null,
         optimizedCV: cvText,
         changes: ['Optimization failed - showing original CV'],
         expectedScore: analysisResults?.interviewChance || 50,
