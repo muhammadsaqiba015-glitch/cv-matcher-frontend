@@ -2,9 +2,34 @@
 
 import React, { useState } from 'react';
 
+interface StructuredCV {
+  name: string;
+  title: string;
+  email: string;
+  phone: string;
+  linkedin: string;
+  location: string;
+  summary: string;
+  experience: Array<{
+    jobTitle: string;
+    company: string;
+    companyDescription?: string;
+    duration: string;
+    location: string;
+    bullets: string[];
+  }>;
+  education: Array<{
+    degree: string;
+    school: string;
+    year: string;
+    location: string;
+  }>;
+  skills: string[];
+}
+
 interface OptimizationSectionProps {
   optimizedCV: {
-    structuredCV?: any;
+    structured?: StructuredCV;
     optimizedCV: string;
     changes: string[];
     expectedScore: number;
@@ -26,123 +51,15 @@ export default function OptimizationSection({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Parse CV text into structured sections
-  const parseCV = (text: string) => {
-    const lines = text.split('\n').map(l => l.trim());
+  const handleDownloadPDF = () => {
+    const cv = optimizedCV.structured;
 
-    let name = '';
-    let title = '';
-    let contact: string[] = [];
-    let summary = '';
-    let experience: Array<{ jobTitle: string; company: string; date: string; location: string; description: string; bullets: string[] }> = [];
-    let education: Array<{ degree: string; school: string; details: string }> = [];
-    let skills: string[] = [];
-
-    let currentSection = '';
-    let currentExp: any = null;
-    let currentEdu: any = null;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (!line) continue;
-
-      const lineLower = line.toLowerCase();
-
-      // Detect section headers
-      if (/^(professional\s+)?summary$/i.test(line) || /^(career\s+)?objective$/i.test(line) || /^profile$/i.test(line)) {
-        if (currentExp) { experience.push(currentExp); currentExp = null; }
-        if (currentEdu) { education.push(currentEdu); currentEdu = null; }
-        currentSection = 'summary';
-        continue;
-      }
-      if (/^(professional\s+)?experience$/i.test(line) || /^work\s+(history|experience)$/i.test(line) || /^employment$/i.test(line)) {
-        if (currentExp) { experience.push(currentExp); currentExp = null; }
-        if (currentEdu) { education.push(currentEdu); currentEdu = null; }
-        currentSection = 'experience';
-        continue;
-      }
-      if (/^education$/i.test(line) || /^academic/i.test(line)) {
-        if (currentExp) { experience.push(currentExp); currentExp = null; }
-        if (currentEdu) { education.push(currentEdu); currentEdu = null; }
-        currentSection = 'education';
-        continue;
-      }
-      if (/^(technical\s+)?skills$/i.test(line) || /^competencies$/i.test(line) || /^expertise$/i.test(line)) {
-        if (currentExp) { experience.push(currentExp); currentExp = null; }
-        if (currentEdu) { education.push(currentEdu); currentEdu = null; }
-        currentSection = 'skills';
-        continue;
-      }
-
-      // Parse header (before any section)
-      if (!currentSection) {
-        if (!name && line.length > 2 && line.length < 50 && !line.includes('@') && !/^\+?\d/.test(line)) {
-          name = line;
-          continue;
-        }
-        if (name && !title && line.length > 2 && line.length < 80 && !line.includes('@') && !/^\+?\d/.test(line)) {
-          title = line;
-          continue;
-        }
-        if (line.includes('@') || /\+?\d{10,}/.test(line.replace(/[\s\-]/g, '')) || lineLower.includes('linkedin')) {
-          contact.push(line);
-          continue;
-        }
-      }
-
-      // Parse sections
-      if (currentSection === 'summary') {
-        summary += (summary ? ' ' : '') + line;
-      } else if (currentSection === 'experience') {
-        const isBullet = /^[•\-\*–◦]/.test(line);
-        const hasDate = /\d{4}|present/i.test(line);
-
-        if (isBullet) {
-          if (currentExp) {
-            currentExp.bullets.push(line.replace(/^[•\-\*–◦]\s*/, ''));
-          }
-        } else if (hasDate && line.includes('|')) {
-          // Line with date and pipe - likely "Company | Date"
-          if (currentExp && currentExp.jobTitle) {
-            experience.push(currentExp);
-          }
-          currentExp = { jobTitle: '', company: line, date: '', location: '', description: '', bullets: [] };
-        } else if (currentExp && !currentExp.jobTitle) {
-          currentExp.jobTitle = line;
-        } else if (!currentExp) {
-          currentExp = { jobTitle: line, company: '', date: '', location: '', description: '', bullets: [] };
-        } else if (currentExp && !currentExp.company) {
-          currentExp.company = line;
-        } else if (currentExp && line.length > 30 && !isBullet) {
-          // Likely a description line
-          currentExp.description = line;
-        }
-      } else if (currentSection === 'education') {
-        if (!currentEdu) {
-          currentEdu = { degree: line, school: '', details: '' };
-        } else if (!currentEdu.school) {
-          currentEdu.school = line;
-        } else {
-          currentEdu.details += (currentEdu.details ? ' | ' : '') + line;
-        }
-      } else if (currentSection === 'skills') {
-        const skillItems = line.split(/[,|•;]/).map(s => s.trim().replace(/^[\-\*]\s*/, '')).filter(s => s.length > 1 && s.length < 50);
-        skills.push(...skillItems);
-      }
+    if (!cv) {
+      alert('CV data not available. Please try optimizing again.');
+      return;
     }
 
-    // Save last items
-    if (currentExp && currentExp.jobTitle) experience.push(currentExp);
-    if (currentEdu && currentEdu.degree) education.push(currentEdu);
-
-    return { name, title, contact, summary, experience, education, skills };
-  };
-
-  const handleDownloadPDF = () => {
-    const cvText = optimizedCV.optimizedCV || '';
-    const cv = parseCV(cvText);
-
-    // Generate professional HTML
+    // Generate clean HTML for the CV
     const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
@@ -152,110 +69,94 @@ export default function OptimizationSection({
   <title>${cv.name || 'CV'} - Resume</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     
-    @page {
-      size: A4;
-      margin: 0;
-    }
+    @page { size: A4; margin: 0; }
     
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 11px;
-      line-height: 1.5;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 10px;
+      line-height: 1.4;
       color: #333;
-      background: #f5f5f5;
+      background: #f0f0f0;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
     
-    .cv-container {
-      max-width: 210mm;
+    .cv-page {
+      width: 210mm;
       min-height: 297mm;
       margin: 20px auto;
       background: white;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
       display: grid;
-      grid-template-columns: 1fr 220px;
+      grid-template-columns: 1fr 200px;
     }
     
     @media print {
-      body {
-        background: white;
-      }
-      .cv-container {
-        margin: 0;
-        box-shadow: none;
-        max-width: none;
-      }
-      .print-btn {
-        display: none !important;
-      }
+      body { background: white; }
+      .cv-page { margin: 0; box-shadow: none; }
+      .no-print { display: none !important; }
     }
     
-    /* Left Column - Main Content */
-    .main-content {
-      padding: 35px 30px 35px 35px;
-    }
+    /* Left Column */
+    .main { padding: 30px 25px 30px 30px; }
     
-    /* Right Column - Sidebar */
+    /* Right Column */
     .sidebar {
-      background: #f8fafc;
-      padding: 35px 25px;
+      background: #f8f9fa;
+      padding: 30px 20px;
       border-left: 3px solid #0ea5e9;
     }
     
     /* Header */
     .name {
-      font-size: 28px;
+      font-size: 24px;
       font-weight: 700;
       color: #1a1a1a;
-      letter-spacing: -0.5px;
       margin-bottom: 4px;
     }
     
     .title {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       color: #0ea5e9;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
     
-    .contact-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
+    .contact {
       font-size: 9px;
       color: #666;
       margin-bottom: 20px;
-      padding-bottom: 15px;
-      border-bottom: 1px solid #e5e5e5;
+      line-height: 1.6;
     }
     
-    .contact-item {
-      display: flex;
-      align-items: center;
-      gap: 4px;
+    .contact a {
+      color: #0ea5e9;
+      text-decoration: none;
     }
     
-    /* Section Headers */
+    .contact a:hover {
+      text-decoration: underline;
+    }
+    
+    .divider {
+      border-bottom: 1px solid #e0e0e0;
+      margin-bottom: 20px;
+    }
+    
+    /* Sections */
+    .section { margin-bottom: 20px; }
+    
     .section-title {
       font-size: 11px;
       font-weight: 700;
       color: #1a1a1a;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 12px;
-      padding-bottom: 6px;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+      padding-bottom: 5px;
       border-bottom: 2px solid #0ea5e9;
-    }
-    
-    .sidebar .section-title {
-      font-size: 10px;
     }
     
     /* Summary */
@@ -263,16 +164,12 @@ export default function OptimizationSection({
       font-size: 10px;
       color: #444;
       line-height: 1.6;
-      margin-bottom: 25px;
     }
     
     /* Experience */
-    .experience-section {
-      margin-bottom: 20px;
-    }
-    
     .job {
-      margin-bottom: 18px;
+      margin-bottom: 16px;
+      page-break-inside: avoid;
     }
     
     .job-title {
@@ -291,31 +188,32 @@ export default function OptimizationSection({
     .job-meta {
       font-size: 9px;
       color: #888;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
     
-    .job-description {
+    .job-desc {
       font-size: 9px;
-      color: #555;
+      color: #666;
       font-style: italic;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
     
-    .job-bullets {
+    .bullets {
       list-style: none;
       padding: 0;
+      margin: 0;
     }
     
-    .job-bullets li {
+    .bullets li {
       position: relative;
-      padding-left: 14px;
+      padding-left: 12px;
       font-size: 9px;
       color: #444;
-      margin-bottom: 5px;
+      margin-bottom: 4px;
       line-height: 1.5;
     }
     
-    .job-bullets li::before {
+    .bullets li::before {
       content: "•";
       position: absolute;
       left: 0;
@@ -323,132 +221,126 @@ export default function OptimizationSection({
       font-weight: bold;
     }
     
-    /* Sidebar - Education */
-    .education-item {
-      margin-bottom: 15px;
-    }
+    /* Sidebar */
+    .sidebar-section { margin-bottom: 20px; }
     
-    .edu-degree {
+    .sidebar-title {
       font-size: 10px;
       font-weight: 700;
       color: #1a1a1a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+      padding-bottom: 5px;
+      border-bottom: 2px solid #0ea5e9;
     }
     
-    .edu-school {
-      font-size: 9px;
-      font-weight: 600;
-      color: #0ea5e9;
-    }
+    /* Education */
+    .edu-item { margin-bottom: 12px; }
+    .edu-degree { font-size: 10px; font-weight: 700; color: #1a1a1a; }
+    .edu-school { font-size: 9px; font-weight: 600; color: #0ea5e9; }
+    .edu-meta { font-size: 8px; color: #888; margin-top: 2px; }
     
-    .edu-details {
-      font-size: 8px;
-      color: #888;
-    }
-    
-    /* Sidebar - Skills */
-    .skills-grid {
+    /* Skills */
+    .skills-list {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 5px;
     }
     
-    .skill-tag {
+    .skill {
       background: white;
       border: 1px solid #ddd;
-      padding: 4px 10px;
+      padding: 3px 8px;
       border-radius: 3px;
       font-size: 8px;
-      font-weight: 500;
       color: #333;
     }
     
     /* Print Button */
-    .print-btn {
+    .print-bar {
       position: fixed;
-      top: 20px;
-      right: 20px;
-      background: linear-gradient(135deg, #0ea5e9, #0284c7);
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #1a1a1a;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
+      z-index: 1000;
+    }
+    
+    .print-btn {
+      background: #0ea5e9;
       color: white;
       border: none;
-      padding: 12px 24px;
-      border-radius: 8px;
+      padding: 10px 20px;
+      border-radius: 6px;
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
       display: flex;
       align-items: center;
       gap: 8px;
-      transition: transform 0.2s, box-shadow 0.2s;
     }
     
-    .print-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(14, 165, 233, 0.5);
-    }
+    .print-btn:hover { background: #0284c7; }
     
-    .instructions {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #1a1a1a;
-      color: white;
-      padding: 12px 20px;
-      border-radius: 8px;
+    .print-info {
+      color: #aaa;
       font-size: 12px;
-      text-align: center;
-    }
-    
-    @media print {
-      .instructions {
-        display: none;
-      }
     }
   </style>
 </head>
 <body>
-  <button class="print-btn" onclick="window.print()">
-    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
-    </svg>
-    Save as PDF
-  </button>
-  
-  <div class="instructions">
-    💡 Click "Save as PDF" → In print dialog, select "Save as PDF" as destination → Click Save
+  <div class="print-bar no-print">
+    <button class="print-btn" onclick="window.print()">
+      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+      </svg>
+      Save as PDF
+    </button>
+    <span class="print-info">Select "Save as PDF" as destination in the print dialog</span>
   </div>
   
-  <div class="cv-container">
-    <!-- Main Content -->
-    <div class="main-content">
-      ${cv.name ? `<h1 class="name">${cv.name.toUpperCase()}</h1>` : ''}
-      ${cv.title ? `<p class="title">${cv.title}</p>` : ''}
+  <div class="cv-page" style="margin-top: 70px;">
+    <div class="main">
+      <h1 class="name">${cv.name?.toUpperCase() || ''}</h1>
+      <p class="title">${cv.title || ''}</p>
       
-      ${cv.contact.length > 0 ? `
-        <div class="contact-row">
-          ${cv.contact.map(c => `<span class="contact-item">${c}</span>`).join('')}
-        </div>
-      ` : ''}
+      <div class="contact">
+        ${cv.phone ? `<span>${cv.phone}</span>` : ''}
+        ${cv.phone && cv.email ? ' &nbsp;•&nbsp; ' : ''}
+        ${cv.email ? `<a href="mailto:${cv.email}">${cv.email}</a>` : ''}
+        ${(cv.phone || cv.email) && cv.linkedin ? '<br>' : ''}
+        ${cv.linkedin ? `<a href="${cv.linkedin.startsWith('http') ? cv.linkedin : 'https://linkedin.com/in/' + cv.linkedin}" target="_blank">LinkedIn: ${cv.linkedin.replace('https://linkedin.com/in/', '').replace('https://www.linkedin.com/in/', '')}</a>` : ''}
+        ${cv.linkedin && cv.location ? ' &nbsp;•&nbsp; ' : ''}
+        ${cv.location ? `<span>${cv.location}</span>` : ''}
+      </div>
+      
+      <div class="divider"></div>
       
       ${cv.summary ? `
-        <div class="summary-section">
+        <div class="section">
           <h2 class="section-title">Professional Summary</h2>
           <p class="summary">${cv.summary}</p>
         </div>
       ` : ''}
       
-      ${cv.experience.length > 0 ? `
-        <div class="experience-section">
+      ${cv.experience && cv.experience.length > 0 ? `
+        <div class="section">
           <h2 class="section-title">Professional Experience</h2>
-          ${cv.experience.map(exp => `
+          ${cv.experience.map(job => `
             <div class="job">
-              <p class="job-title">${exp.jobTitle}</p>
-              ${exp.company ? `<p class="job-company">${exp.company}</p>` : ''}
-              ${exp.description ? `<p class="job-description">${exp.description}</p>` : ''}
-              ${exp.bullets.length > 0 ? `
-                <ul class="job-bullets">
-                  ${exp.bullets.map(b => `<li>${b}</li>`).join('')}
+              <p class="job-title">${job.jobTitle || ''}</p>
+              <p class="job-company">${job.company || ''}</p>
+              <p class="job-meta">${job.duration || ''}${job.duration && job.location ? ' • ' : ''}${job.location || ''}</p>
+              ${job.companyDescription ? `<p class="job-desc">${job.companyDescription}</p>` : ''}
+              ${job.bullets && job.bullets.length > 0 ? `
+                <ul class="bullets">
+                  ${job.bullets.map(b => `<li>${b}</li>`).join('')}
                 </ul>
               ` : ''}
             </div>
@@ -457,26 +349,25 @@ export default function OptimizationSection({
       ` : ''}
     </div>
     
-    <!-- Sidebar -->
     <div class="sidebar">
-      ${cv.education.length > 0 ? `
-        <div class="education-section" style="margin-bottom: 25px;">
-          <h2 class="section-title">Education</h2>
+      ${cv.education && cv.education.length > 0 ? `
+        <div class="sidebar-section">
+          <h2 class="sidebar-title">Education</h2>
           ${cv.education.map(edu => `
-            <div class="education-item">
-              <p class="edu-degree">${edu.degree}</p>
-              ${edu.school ? `<p class="edu-school">${edu.school}</p>` : ''}
-              ${edu.details ? `<p class="edu-details">${edu.details}</p>` : ''}
+            <div class="edu-item">
+              <p class="edu-degree">${edu.degree || ''}</p>
+              <p class="edu-school">${edu.school || ''}</p>
+              <p class="edu-meta">${edu.year || ''}${edu.year && edu.location ? ' • ' : ''}${edu.location || ''}</p>
             </div>
           `).join('')}
         </div>
       ` : ''}
       
-      ${cv.skills.length > 0 ? `
-        <div class="skills-section">
-          <h2 class="section-title">Skills</h2>
-          <div class="skills-grid">
-            ${cv.skills.map(s => `<span class="skill-tag">${s}</span>`).join('')}
+      ${cv.skills && cv.skills.length > 0 ? `
+        <div class="sidebar-section">
+          <h2 class="sidebar-title">Skills</h2>
+          <div class="skills-list">
+            ${cv.skills.map(s => `<span class="skill">${s}</span>`).join('')}
           </div>
         </div>
       ` : ''}
@@ -504,9 +395,20 @@ export default function OptimizationSection({
           Optimized CV
         </h3>
         <span className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg font-medium">
-          Expected Score: {optimizedCV.expectedScore || 85}%
+          Expected Score: {optimizedCV.expectedScore || 70}%
         </span>
       </div>
+
+      {/* Honest Assessment */}
+      {optimizedCV.honestAssessment && (
+        <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+          <h4 className="text-lg font-semibold text-yellow-400 mb-2 flex items-center">
+            <span className="mr-2">💡</span>
+            Honest Assessment
+          </h4>
+          <p className="text-gray-300 text-sm">{optimizedCV.honestAssessment}</p>
+        </div>
+      )}
 
       {/* Changes Made */}
       {optimizedCV.changes && optimizedCV.changes.length > 0 && (
@@ -537,17 +439,6 @@ export default function OptimizationSection({
         </div>
       )}
 
-      {/* Honest Assessment */}
-      {optimizedCV.honestAssessment && (
-        <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
-          <h4 className="text-lg font-semibold text-yellow-400 mb-2 flex items-center">
-            <span className="mr-2">💡</span>
-            Honest Assessment
-          </h4>
-          <p className="text-gray-300 text-sm">{optimizedCV.honestAssessment}</p>
-        </div>
-      )}
-
       {/* CV Preview */}
       <div className="bg-white/5 rounded-xl p-6 max-h-96 overflow-y-auto mb-6">
         <pre className="text-gray-300 whitespace-pre-wrap font-sans text-sm leading-relaxed">
@@ -559,7 +450,11 @@ export default function OptimizationSection({
       <div className="flex flex-wrap gap-4">
         <button
           onClick={handleDownloadPDF}
-          className="flex-1 min-w-[200px] py-4 font-bold rounded-xl transition-all duration-300 flex items-center justify-center bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+          disabled={!optimizedCV.structured}
+          className={`flex-1 min-w-[200px] py-4 font-bold rounded-xl transition-all duration-300 flex items-center justify-center ${!optimizedCV.structured
+            ? 'bg-gray-600 cursor-not-allowed text-gray-400'
+            : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white'
+            }`}
         >
           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
