@@ -9,6 +9,7 @@ interface OptimizationSectionProps {
     changes: string[];
     expectedScore: number;
     keywordsAdded: string[];
+    honestAssessment?: string;
   };
   onReset: () => void;
 }
@@ -533,6 +534,17 @@ export default function OptimizationSection({
               </span>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Honest Assessment */}
+      {optimizedCV.honestAssessment && (
+        <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+          <h4 className="text-lg font-semibold text-yellow-400 mb-2 flex items-center">
+            <span className="mr-2">💡</span>
+            Honest Assessment
+          </h4>
+          <p className="text-gray-300 text-sm">{optimizedCV.honestAssessment}</p>
         </div>
       )}
 

@@ -1,3 +1,5 @@
+
+
 const Anthropic = require('@anthropic-ai/sdk');
 
 class ClaudeAnalyzer {
@@ -190,91 +192,80 @@ RULES:
   async optimizeCV(jdText, cvText, analysisResults, level = 'honest') {
     const isAggressive = level === 'aggressive';
 
-    const prompt = `You are an expert CV optimization specialist.
+    const prompt = `You are an expert CV optimization specialist. Your job is to INTELLIGENTLY improve a CV to better match a job description.
+
+=== CRITICAL RULES - READ CAREFULLY ===
+
+🚫 ABSOLUTELY FORBIDDEN - NEVER DO THESE:
+1. NEVER add experience the candidate doesn't have
+2. NEVER add skills the candidate hasn't demonstrated  
+3. NEVER fabricate job titles, companies, or responsibilities
+4. NEVER add industry experience they don't have (e.g., don't add "hotel experience" if they worked in e-commerce)
+5. NEVER copy phrases directly from the JD and pretend it's their experience
+6. NEVER lie or exaggerate beyond what's reasonable
+
+✅ WHAT YOU SHOULD DO:
+1. REWORD existing experience using better, more impactful language
+2. HIGHLIGHT transferable skills that apply to the new role
+3. REFRAME experience to show relevance (e.g., "managed customer support" → "led customer experience operations ensuring satisfaction and retention")
+4. USE ACTION VERBS and quantify achievements where possible
+5. REORGANIZE content to put most relevant experience first
+6. IMPROVE the professional summary to better position them for this role
+7. ADD keywords ONLY where they genuinely apply to existing experience
+8. EMPHASIZE achievements and results over just duties
+9. SUGGEST what they could add IF they have relevant experience they may have forgotten
+
+=== THE TASK ===
 
 JOB DESCRIPTION:
-${jdText.substring(0, 2500)}
+${jdText.substring(0, 3000)}
 
 ORIGINAL CV:
-${cvText.substring(0, 3500)}
+${cvText.substring(0, 4000)}
 
-CURRENT SCORE: ${analysisResults?.interviewChance || 50}%
-WEAKNESSES TO ADDRESS: ${(analysisResults?.weaknesses || []).slice(0, 3).join(', ')}
+CURRENT ANALYSIS:
+- Score: ${analysisResults?.interviewChance || 50}%
+- Weaknesses identified: ${(analysisResults?.weaknesses || []).slice(0, 3).join('; ')}
 
-MODE: ${isAggressive ? 'AGGRESSIVE' : 'HONEST'}
+OPTIMIZATION LEVEL: ${isAggressive ? 'AGGRESSIVE (maximize impact while staying truthful)' : 'HONEST (conservative improvements)'}
 
 ${isAggressive ? `
-AGGRESSIVE OPTIMIZATION - TARGET 100% MATCH:
-- Add ALL keywords from the job description
-- Rewrite professional summary to include ALL key requirements
-- Rewrite experience bullets to perfectly align with JD
-- Add all technologies/tools mentioned in JD to skills
-- Use EXACT phrases from job description
-- Maximize keyword density
-- Target score: 95-100%
+AGGRESSIVE MODE INSTRUCTIONS:
+- Push the boundaries of rewording to maximize impact
+- Find creative ways to connect existing experience to JD requirements
+- Use powerful action verbs and industry terminology
+- Emphasize any transferable skills heavily
+- Make the professional summary highly compelling
+- BUT STILL: Never fabricate experience or add false claims
 ` : `
-HONEST OPTIMIZATION:
-- Improve wording to match JD terminology
-- Highlight relevant existing experience
-- Reorganize to emphasize matching skills
-- Do NOT add skills the candidate doesn't have
-- Do NOT fabricate experience
-- Target score: 65-80%
+HONEST MODE INSTRUCTIONS:
+- Make conservative, safe improvements
+- Focus mainly on better wording and structure
+- Don't stretch interpretations too far
+- Keep changes minimal but impactful
 `}
 
-IMPORTANT: You must return BOTH a structured version AND a plain text version of the CV.
+=== OUTPUT FORMAT ===
 
-Return JSON ONLY (no other text):
+Return ONLY valid JSON:
 {
-  "structuredCV": {
-    "name": "<full name from CV - EXTRACT EXACTLY AS WRITTEN>",
-    "title": "<job title/professional title>",
-    "contact": {
-      "phone": "<phone number exactly as in original CV>",
-      "email": "<email address exactly as in original CV>",
-      "linkedin": "<linkedin URL or username exactly as in original CV>",
-      "location": "<city, country or location>"
-    },
-    "summary": "<optimized professional summary paragraph>",
-    "experience": [
-      {
-        "title": "<job title>",
-        "company": "<company name>",
-        "date": "<date range like 04/2023 - Present>",
-        "location": "<location>",
-        "bullets": [
-          "<achievement/responsibility 1>",
-          "<achievement/responsibility 2>",
-          "<achievement/responsibility 3>"
-        ]
-      }
-    ],
-    "education": [
-      {
-        "degree": "<degree name>",
-        "school": "<school/university name>",
-        "date": "<graduation date or date range>",
-        "location": "<location>"
-      }
-    ],
-    "skills": ["<skill 1>", "<skill 2>", "<skill 3>"]
-  },
-  "optimizedCV": "<complete optimized CV as plain text with proper formatting>",
-  "changes": ["<specific change 1>", "<specific change 2>", "<specific change 3>", "<specific change 4>", "<specific change 5>"],
-  "expectedScore": <number>,
-  "keywordsAdded": ["<keyword 1>", "<keyword 2>", "<keyword 3>"]
+  "optimizedCV": "<the complete optimized CV as formatted text - preserve ALL original information, contact details, etc.>",
+  "changes": [
+    "<specific change 1 - e.g., 'Reworded customer support experience to emphasize problem-solving skills'>",
+    "<specific change 2>",
+    "<specific change 3>",
+    "<specific change 4>",
+    "<specific change 5>"
+  ],
+  "expectedScore": <realistic expected score after changes - be honest, don't inflate>,
+  "keywordsAdded": ["<keyword genuinely applicable>", "<keyword genuinely applicable>"],
+  "honestAssessment": "<1-2 sentences about the realistic fit - if there's a significant mismatch between CV and JD, acknowledge it>"
 }
 
-CRITICAL RULES:
-1. Extract ALL personal info (name, phone, email, linkedin, location) from the original CV EXACTLY as written - do not modify contact information
-2. Include ALL experience entries from the original CV
-3. Include ALL education entries from the original CV  
-4. Include ALL skills (original + new keywords added for optimization)
-5. The structuredCV must be COMPLETE and ACCURATE
-6. Phone numbers, emails, and LinkedIn must be copied exactly from the original`;
+REMEMBER: A CV that lies will fail in the interview. Your job is to present the TRUTH in the best possible light, not to fabricate a new truth.`;
 
     try {
-      console.log('Starting optimization, level:', level);
+      console.log('Starting intelligent optimization, level:', level);
 
       const response = await this.client.messages.create({
         model: 'claude-sonnet-4-20250514',
@@ -294,13 +285,11 @@ CRITICAL RULES:
 
       const result = JSON.parse(jsonMatch[0]);
 
-      if (isAggressive && result.expectedScore < 90) {
-        result.expectedScore = 95;
-      }
-
-      // Ensure structuredCV exists
-      if (!result.structuredCV) {
-        result.structuredCV = null;
+      // Don't artificially inflate the expected score
+      // The AI should give a realistic assessment
+      if (isAggressive && result.expectedScore > 85) {
+        // Cap aggressive mode at 85% unless truly exceptional
+        result.expectedScore = Math.min(result.expectedScore, 85);
       }
 
       return result;
@@ -309,11 +298,11 @@ CRITICAL RULES:
       console.error('Optimization error:', error.message);
 
       return {
-        structuredCV: null,
         optimizedCV: cvText,
         changes: ['Optimization failed - showing original CV'],
         expectedScore: analysisResults?.interviewChance || 50,
-        keywordsAdded: []
+        keywordsAdded: [],
+        honestAssessment: 'Unable to optimize. Please try again.'
       };
     }
   }
